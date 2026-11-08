@@ -1,0 +1,30 @@
+# dsh-vocab-digest bundle patch
+#
+# 本文件随插件包一起分发；`dsh plugin add` 之后，dsh 启动时会自动加载它。
+# 叠加顺序：dsh-base → dsh-web-app → 本 bundle patch → profile 的 cordis.patch.yml → --patch
+#
+# 注意：patch 是**整行替换**目标行的 config，故此列出本插件所需的全部键。
+# 所有路径都可以留空 —— 留空时按「调用时的工作目录」相对解析。
+- insert:
+    - id: vocab-digest
+      name: 'dsh-vocab-digest'
+      config:
+        # ── 目录（留空 = 相对当前工作目录）───────────────
+        cwd: !!js process.env.DSH_VOCAB_CWD ?? ''
+        dataDir: ''
+        runRoot: ''
+
+        # ── 抽词参数 ──────────────────────────────────
+        minLen: 3
+        minFreq: 1
+
+        # ── 分章标签维度：pos / difficulty / source / freq（逗号分隔）──
+        by: 'pos'
+
+        # ── 文档样式 ──────────────────────────────────
+        fontCn: '等线'
+        fontEn: 'Calibri'
+        toc: true
+
+        # ── 首次运行是否自动生成 data/ 下默认词表 ─────────
+        autoInit: true

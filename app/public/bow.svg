@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="gn" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#5578C4"/>
+      <stop offset="60%" stop-color="#3A5AA8"/>
+      <stop offset="100%" stop-color="#2E4A92"/>
+    </linearGradient>
+    <linearGradient id="gnDark" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#3E5FAE"/>
+      <stop offset="100%" stop-color="#243B7C"/>
+    </linearGradient>
+  </defs>
+  <!-- 蝴蝶结 -->
+  <path d="M100 96c-14-20-38-30-56-22-14 6-16 26-6 36 10 10 34 4 62-14z" fill="url(#gn)"/>
+  <path d="M100 96c14-20 38-30 56-22 14 6 16 26 6 36-10 10-34 4-62-14z" fill="url(#gn)"/>
+  <!-- 布料褶皱 -->
+  <path d="M52 82c-6 8-4 20 4 26M148 82c6 8 4 20-4 26" stroke="#8FAEE4" stroke-width="2" stroke-linecap="round" fill="none" opacity=".7"/>
+  <!-- 垂带 -->
+  <path d="M92 104c-6 24-14 44-24 60 8 2 16 2 24-2" fill="url(#gnDark)"/>
+  <path d="M108 104c6 24 14 44 24 60-8 2-16 2-24-2" fill="url(#gnDark)"/>
+  <!-- 结心 + 宝石 -->
+  <ellipse cx="100" cy="97" rx="13" ry="14" fill="url(#gnDark)"/>
+  <ellipse cx="100" cy="95" rx="7" ry="7.5" fill="#BFD3F5"/>
+  <ellipse cx="98" cy="93" rx="2.6" ry="3" fill="#EAF1FC"/>
+</svg>

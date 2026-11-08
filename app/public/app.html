@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>词汇库 · DeepSeek Virtual Maid</title>
+<link rel="icon" href="/img/icon-round.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<script id="d-state" type="application/json">{}</script>
+<script id="d-view" type="application/json">{}</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="/img/icon-round.png" alt="" width="44" height="44">
+    <div class="brand-text">
+      <span class="brand-name">词汇库</span>
+      <span class="brand-sub">Virtual Maid · 弹幕字幕整理</span>
+    </div>
+  </div>
+  <div class="topright">
+    <span id="dataHint" class="hint"></span>
+    <button id="btnDocx" class="primary">打开 Word 目录</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="col left">
+
+    <!-- 立绘区：表情随状态变化 -->
+    <figure class="hero" id="hero">
+      <div class="hero-stage">
+        <img class="hero-emo" id="heroEmo" src="/img/emo-laugh.png" alt="">
+        <div class="hero-bubble" id="heroBubble">把视频里的词收进本子里～</div>
+      </div>
+      <img class="hero-wordmark" src="/img/logo-wide.png" alt="DeepSeek Virtual Maid">
+      <ul class="hero-steps" id="heroSteps">
+        <li>贴地址</li><li>挑词表</li><li>出 Word</li>
+      </ul>
+    </figure>
+
+    <section class="card">
+      <h2><span class="step">1</span>视频地址</h2>
+      <div class="row">
+        <input id="link" type="text" placeholder="https://www.bilibili.com/video/BV..." autocomplete="off">
+      </div>
+      <div class="row small">
+        <label class="chk"><input id="withDanmaku" type="checkbox"> 弹幕也一起分析</label>
+        <label class="chk"><input id="asr" type="checkbox" checked> 没字幕就语音识别</label>
+      </div>
+      <div class="row">
+        <button id="btnFetch" class="primary grow">抓取字幕</button>
+        <button id="btnDigestLocal" class="ghost">本地文件</button>
+      </div>
+      <div id="fetchLog" class="log"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span>词表<img class="tack" src="/img/el-bow.png" alt=""></h2>
+      <div class="row">
+        <select id="wordlistSelect"></select>
+      </div>
+      <div class="row small">
+        <button id="btnNewList" class="ghost">新建</button>
+        <button id="btnRenameList" class="ghost">重命名</button>
+        <button id="btnImportList" class="ghost">导入</button>
+        <button id="btnExportList" class="ghost">导出</button>
+      </div>
+      <div class="row small">
+        <label class="ghost filelabel" for="importFile">选文件导入</label>
+        <input id="importFile" type="file" accept=".txt,.md" class="file">
+        <span id="importName" class="muted tiny">未选择文件</span>
+      </div>
+      <div class="row small sub">
+        <label for="digestWordlist">分析时用</label>
+        <select id="digestWordlist"></select>
+      </div>
+      <div id="listHint" class="log"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">3</span>历史运行</h2>
+      <div id="runs" class="runs"></div>
+    </section>
+
+    <figure class="wave-strip" aria-hidden="true">
+      <img src="/img/el-whale.png" alt="" class="whale-swim">
+    </figure>
+  </aside>
+
+  <section class="col middle">
+    <div class="card bar">
+      <div class="barcode">
+        <img class="bow" src="/img/el-bow.png" alt="" width="48" height="40">
+        <div>
+          <div id="title" class="title">还没有选运行</div>
+          <div id="subtitle" class="subtitle"></div>
+          <div id="stats" class="stats"></div>
+        </div>
+      </div>
+      <div class="row wrap tools">
+        <label for="dim">分章维度</label>
+        <select id="dim" class="dimsel">
+          <option value="pos">词性</option>
+          <option value="difficulty">难度</option>
+          <option value="freq">频次</option>
+          <option value="source">来源</option>
+        </select>
+        <button id="btnBuild" class="ghost">按这个维度重出 Word</button>
+      </div>
+      <div id="chips" class="chips"></div>
+    </div>
+    <div id="items" class="items"></div>
+  </section>
+
+  <aside class="col right">
+    <section class="card">
+      <h2>词表内容<img class="tack" src="/img/el-tail.png" alt=""></h2>
+      <div id="listCards" class="listCards"></div>
+      <div class="row small">
+        <button id="btnExportCards" class="ghost">导出词表</button>
+        <button id="btnFromRun" class="ghost">用本次结果建表</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2>用法 / 详情</h2>
+      <div id="detail" class="detail">
+        <div class="detail-idle">
+          <img src="/img/emo-pout.png" alt="" class="idle-emo">
+          <span class="muted">点中间任意词条看用法，句子上的时间点可以直接跳到视频那一秒。</span>
+        </div>
+      </div>
+    </section>
+    <figure class="apron-note">
+      <img src="/img/el-apron.png" alt="" width="112">
+    </figure>
+  </aside>
+</main>
+
+<div id="toast" class="toast"><img id="toastEmo" src="/img/emo-laugh.png" alt=""><span id="toastText"></span></div>
+<script src="/app.js"></script>
+</body>
+</html>

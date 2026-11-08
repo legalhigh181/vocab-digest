@@ -1,0 +1,66 @@
+# 基础词表：一行一个。默认只做标记，不单独成章（docx.includeBase=false 时仍会出现在词频表）。
+about above accept across act add admit afraid after again against age agree air allow almost alone along
+already also although always among amount ancient angry animal answer anyone anything appear apple area
+argue arm around arrive art ask attention aunt autumn avoid awake
+baby back bad bag ball bank bar base basket battle beach bear beat beautiful because become bed before
+begin behind believe below beside best better between big bird birth bit black blood blue board boat body
+book born both bottle bottom box boy brain branch brave bread break breakfast breathe bridge bright bring
+brother brown build burn business busy but buy
+cake call calm camera camp can capital car card care careful carry case castle catch cause center century
+certain chair chance change character cheap check cheese child choose church circle city class clean clear
+clever climb clock close clothes cloud club coach cold collect college color come comfortable common
+company compare complete computer concern condition connect consider contain continue control cook cool
+copy corner correct cost count country course cover create cross crowd cry culture cup cut
+daily damage dance danger dark date daughter day dead deal dear death decide deep degree delay deliver
+demand depend describe desert design desk detail develop die difference difficult dinner direct dirty
+discover discuss dish distance divide doctor dog door double doubt down draw dream dress drink drive drop
+dry during duty
+each ear early earth east easy eat edge education effect effort egg eight either else empty end enemy
+energy enjoy enough enter entire environment equal escape especially even evening event ever every
+everyone everything exactly example excellent except exchange excited exercise expect expensive
+experience explain express eye
+face fact fail fair fall family famous far farm fast father fear feed feel few field fight fill film
+final find fine finger finish fire first fish fit five fix flat floor flower fly follow food foot for
+forest forget form free fresh friend from front fruit full fun future
+game garden gas general gentle get gift girl give glad glass go goal good government grass great green
+grow guard guess guest guide
+half hand happen happy hard hat hate have head health hear heart heavy help here high hill history hit
+hold hole holiday home hope horse hospital hot hour house how huge human hundred hurt
+ice idea if imagine important improve include increase indeed industry information inside instead
+interest into introduce invite issue
+join joke journey joy judge jump just
+keep key kid kill kind king kitchen know knowledge
+lake land language large last late laugh law lay lead learn leave left leg less lesson letter level lie
+life light like line listen little live local long look lose lot loud love low lucky
+machine main make man manage many map mark market marry match matter may maybe meal mean meat medicine
+meet member memory mention middle might mile milk mind minute miss mistake mix model modern moment
+money month moon morning most mother mountain mouth move movie music must
+name narrow nation natural near necessary need neighbor neither never new news next nice night nobody
+noise none north nose note nothing notice now number
+ocean offer office often oil old once only open opinion or order other outside over own
+page pain paint pair paper parent park part party pass past patient pay peace people perfect perhaps
+person picture piece place plan plant play please pleasure point police poor popular position possible
+power practice prepare present pressure pretty price problem produce program progress project promise
+protect prove provide public pull push put
+question quick quiet quite
+race radio rain raise reach read ready real reason receive recent recognize record red reduce remember
+remove reply report require rest result return rich right ring rise river road rock role room round
+rule run
+safe sail same save say school science sea season seat second see seem sell send sense serious serve
+service set several share sharp short should show sick side sign silence silver simple since single
+sister sit size skill sky sleep slow small smile snow soft soldier solve some someone something
+sometimes son song soon sorry sound south space speak special speed spend spirit sport spring stand
+star start state stay steal step stick still stone stop store story straight strange street strong
+student study stupid succeed such sudden suggest summer sun support suppose sure surface surprise
+sweet swim system
+table tail take talk tall taste teach team tell temperature ten term test than thank that theater
+their then there thick thin thing think third this though thousand three through throw ticket tidy
+tie time tiny tired today together tomato tomorrow tonight too tool tooth top total touch toward
+town trade train translate travel tree trip trouble true trust try turn twelve twenty twice two type
+ugly uncle under understand unit until up upon use useful usual
+value various vegetable very view village visit voice
+wait wake walk wall want war warm wash watch water way weak wear weather week welcome well west wet
+what wheel when where whether which while white who whole why wide wife wild will win wind window
+wine winter wish with within without woman wonder wood word work world worry write wrong
+year yellow yes yesterday yet young
+zero

@@ -1,0 +1,49 @@
+# 依赖
+node_modules/
+
+# 运行时产物
+# runs/ 是每次 digest 的结果（含视频帧、转录文本）
+runs/
+# dist/ 是打包出来的 zip
+dist/
+# build/ 是 exe 打包中间产物
+build/
+# 打包好的可执行文件走 GitHub Release，不进仓库
+*.exe
+*.zip
+
+# 大文件 / 外部数据（用脚本下载，不要塞进 git）
+# models/ 里是 whisper 模型 ggml-*.bin（465MB）
+models/
+# data/ecdict.csv 是 ECDICT 英汉词典（63MB，MIT 协议），用「下载词典.cmd」获取
+data/ecdict.csv
+# 词典分块下载的临时文件
+data/.ecdict.part*
+# samples/ 是真实视频的转录/弹幕样本，只保留 test/fixtures 里的小样例
+samples/
+
+# 用户数据（绝不提交）
+# data/wordlists/ 是个人词表：我的词汇 / 我的短语 / 导入的词表
+data/wordlists/
+# data/known/known.txt 是已掌握词（个人进度）
+data/known/known.txt
+
+# 调试与临时文件
+scratch-*
+.obsidian/
+*.log
+*.tmp
+*.bak
+*.bak2
+data/*.bak*
+
+# UI 版本快照（本地过程文件）
+versions/
+
+# 素材原图（5 张设定大图，抠好的成品保留在 app/public/img/）
+*-sheet.png
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store

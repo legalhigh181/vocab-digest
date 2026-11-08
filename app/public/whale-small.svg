@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="wb" x1="15%" y1="0%" x2="75%" y2="100%">
+      <stop offset="0%" stop-color="#8FAEEA"/>
+      <stop offset="52%" stop-color="#4468B8"/>
+      <stop offset="100%" stop-color="#2A3F86"/>
+    </linearGradient>
+  </defs>
+  <!-- 简化版：只有身体 + 尾巴 + 眼睛，供小型图标使用 -->
+  <path d="M13 33c0-11 9-19 20-19 9 0 15.5 4 18.5 10L58 16c1.2-1.6 3.6-1 4.2 1l4 11c.5 1.6.2 3.2-.8 4.4l-5.8 7c.4 2.6.6 5.2.6 7.6 0 3.4-2.8 6.2-6.2 6.2H19.2C15.8 47 13 44.2 13 40.8V33z" fill="url(#wb)"/>
+  <path d="M17 42h45c0 4-3.2 7-7 7H24c-3.9 0-7-3-7-7z" fill="#F6F9FE"/>
+  <circle cx="27" cy="31" r="3.2" fill="#17223F"/>
+  <circle cx="28.2" cy="29.9" r="1.1" fill="#fff"/>
+  <ellipse cx="21" cy="37" rx="3.6" ry="2" fill="#EFB6C4" opacity=".8"/>
+</svg>

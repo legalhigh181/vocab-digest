@@ -1,0 +1,42 @@
+{
+  "runRoot": "runs",
+  "outDir": "out",
+  "dataDir": "data",
+  "input": {
+    "formats": ["json", "xml", "srt", "vtt", "ass", "ssa", "txt"]
+  },
+  "lexicon": {
+    "minLen": 3,
+    "minFreq": 1,
+    "maxDanmakuPerSec": 20,
+    "stopwordFile": "data/stopword.txt",
+    "knownFile": "data/known/known.txt",
+    "baseFile": "data/base/base.txt",
+    "lemmatizeExceptions": "data/lemmatize.exceptions.json",
+    "posFile": "data/pos.json",
+    "excludeRegex": ""
+  },
+  "classify": {
+    "by": ["pos"],
+    "byPos": true,
+    "bySource": false,
+    "unknownBatchSize": 40
+  },
+  "docx": {
+    "titlePrefix": "英语词汇整理",
+    "fontCn": "等线",
+    "fontEn": "Calibri",
+    "toc": true,
+    "samplePerWord": 3,
+    "includeBase": false
+  },
+  "source": {
+    "bilibili": {
+      "enabled": false,
+      "cookie": "",
+      "minDelayMs": 800,
+      "maxDelayMs": 1500,
+      "maxRetry": 3
+    }
+  }
+}

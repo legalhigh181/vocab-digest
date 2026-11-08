@@ -1,0 +1,15 @@
+1
+00:00:01,000 --> 00:00:04,000
+Speaker is explaining the vocabulary review workflow.
+
+2
+00:00:04,500 --> 00:00:08,000
+Batch processing means we summarize many files at once.
+
+3
+00:00:08,500 --> 00:00:12,000
+The document should be organized by part of speech.
+
+4
+00:00:12,500 --> 00:00:16,000
+Deterministic output makes regression testing feasible.

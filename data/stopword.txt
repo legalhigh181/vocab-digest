@@ -1,0 +1,21 @@
+# 停用词表：一行一个，# 开头为注释。这些词不会进入词汇正文。
+a an the
+and or but nor so yet
+of in on at to for from by with about against between into through during before after above below
+up down out off over under again further then once here there when where why how all any both each
+few more most other some such no not only own same than too very
+i me my myself we our ours ourselves you your yours yourself yourselves he him his himself she her hers
+herself it its itself they them their theirs themselves
+am is are was were be been being
+have has had having
+do does did doing done
+will would shall should can could may might must ought
+this that these those what which who whom whose
+if as because while though although unless until since
+also just even still ever never always often sometimes usually rather quite almost enough
+get got make made take took taken go went gone come came see saw seen know knew known think thought
+say said tell told want wanted like liked need needed use used keep kept put going gonna wanna
+yeah yep ok okay oh ah um uh er hmm wow hey hi hello bye please thanks thank sorry yes no
+lol lmao rofl wtf omg btw imo tbh idk idc bilibili up av bv
+good great nice cool fine bad really very much many lot lots little bit kind sort thing things way ways
+one two three four five six seven eight nine ten first second third
