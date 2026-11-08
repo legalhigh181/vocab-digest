@@ -13,6 +13,109 @@
 分章 → 生成 docx（原生 OOXML，不依赖 Word）→ 自检
 ```
 
+> 不想读源码？直接跳到 **[从零开始（拿到代码后怎么跑）](#从零开始拿到代码后怎么跑)**。
+
+## 功能一览
+
+- **输入**：B 站字幕 JSON、弹幕 XML、srt / vtt / ass / txt；也可以直接贴 B 站视频地址，自动抓字幕和弹幕
+- **没有字幕怎么办**：内置 ffmpeg 的 whisper 滤镜做语音识别（598 秒视频 64 秒转完，约 9 倍实时）
+- **词形还原**：`runs / running / ran` 合成一个词条，不规则动词、`-ies / -ves / -es` 都处理
+- **离线英汉词典**：接了 ECDICT（77 万词条），查词 1 毫秒，**不联网、不耗 token**
+- **按标签看**：词性 / 难度 / 来源 / 频次四个维度，可以切换分章方式
+- **Word 输出**：封面、目录、按标签分章、每个词条带音标 + 释义 + 原文用法（附时间戳）+ 剑桥词典超链接
+- **Web 界面**：本地起服务，粘地址 → 抓字幕 → 挑词表 → 出 Word，全程点鼠标
+- **个人词表**：可以新建多张表、导入导出、重命名；不同视频用不同词表
+
+## 从零开始（拿到代码后怎么跑）
+
+### 需要什么
+
+| 项目 | 要求 | 说明 |
+|---|---|---|
+| 系统 | Windows 10 / 11 | 界面和启动器按 Windows 写的；引擎本身跨平台 |
+| Node.js | **20 或更高** | 去 https://nodejs.org 下 LTS 版，一路下一步即可 |
+| ffmpeg | 可选 | 只在「视频没有字幕、需要语音识别」时才用 |
+
+### 第一步：拿到代码
+
+```bash
+git clone https://github.com/legalhigh181/vocab-digest.git
+cd vocab-digest
+```
+
+或者直接下载 ZIP 解压。
+
+### 第二步：装词典（强烈建议，一次就够）
+
+没有词典也能跑，但词条会缺中文释义。仓库里**不含**词典数据（63 MB），用脚本自己下：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\download-dict.ps1
+```
+
+它会从 GitHub 下载 ECDICT 到 `data\ecdict.csv`，然后自检大小是不是 66009548 字节。
+
+### 第三步：跑一次看看
+
+```powershell
+# 初始化词表（第一次需要）
+node bin\vocab-english.js init
+
+# 用仓库自带的测试数据跑一遍
+node bin\vocab-english.js digest test\fixtures --run-id demo
+
+# 结果在 runs\demo\vocab.docx
+```
+
+### 第四步：开始用
+
+两种方式，任选：
+
+**方式 A：Web 界面（推荐）**
+
+```powershell
+node bin\vocab-app.js --cwd . --port 7788
+```
+
+浏览器打开 http://127.0.0.1:7788/ ，左侧粘 B 站地址，点「抓取字幕」，然后挑词表、点「出 Word」。
+
+想让它像普通软件一样双击打开，跑一次安装脚本，桌面就会多一个「词汇库」图标：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\install-shortcuts.ps1
+```
+
+**方式 B：命令行**
+
+```powershell
+# 一个目录里的所有字幕/弹幕
+node bin\vocab-english.js digest "D:\某期视频\"
+
+# 只有视频、没有字幕
+node bin\vocab-english.js transcribe 视频.mp4 --out 视频.srt
+node bin\vocab-english.js digest 视频.srt
+```
+
+### 语音识别要准备的模型（可选）
+
+ffmpeg 自带 whisper 滤镜，但模型要自己下（465 MB）：
+
+```
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+# 国内镜像：https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+```
+
+放到项目根目录的 `models\ggml-small.bin`，就会被自动找到。跑 `node bin\vocab-english.js status` 可以确认能不能用。
+
+### 常见问题
+
+| 现象 | 原因 / 解法 |
+|---|---|
+| 双击快捷方式图标是白纸 | Windows 读不了**含中文路径**里的 ico。安装脚本会自动把图标复制到 `%LOCALAPPDATA%\VocabDigest\`（纯英文路径）；如果是手动建的快捷方式，按这个思路改 |
+| 词条没有中文释义 | 没装 ECDICT 词典，见第二步；或这个词词典里没有，点词条上的「剑桥」在线查 |
+| 抓 B 站字幕失败 | 需要联网；分 P 视频要指定 `--page`；大会员专属视频抓不到 |
+| 语音识别很慢 | 没走 GPU。检查 ffmpeg 是否是带 CUDA 的版本；或换 `ggml-base.bin`（更快但没那么准） |
+
 ## 桌面客户端（推荐给日常使用）
 
 双击桌面上的 **「词汇库」** 图标即可。它会做三件事：

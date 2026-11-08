@@ -41,6 +41,14 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/legalhigh181/vocab-digest.git"
+  },
+  "homepage": "https://github.com/legalhigh181/vocab-digest#readme",
+  "bugs": {
+    "url": "https://github.com/legalhigh181/vocab-digest/issues"
+  },
   "license": "MIT",
-  "private": true
+  "private": false
 }
