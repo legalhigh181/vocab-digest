@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   cardsHash, cardsToText, dedupeCards, normalizeNewlines, parseWordListText, primarySense,
 } from '../src/wordlists/import.js';
-import { WordlistStore, slugify } from '../src/wordlists/store.js';
+import {
+  WordlistStore, normalizeCount, readKnownFile, slugify,
+} from '../src/wordlists/store.js';
 
 // ── 导入器 ────────────────────────────────────────────────
 
@@ -165,4 +167,184 @@ test('词表：备份文件可以被读回（json 结构完整）', () => {
   const payload = JSON.parse(readFileSync(out, 'utf8'));
   assert.equal(payload.cards.length, 1);
   assert.equal(payload.meta.id, a.id);
+});
+
+// ── T4：单词表存储的四项独立修复 ──────────────────────────
+// 这一组只覆盖「存储层」本身。日文卡片、读音和导出要等 T3 接入后才验收，
+// 所以整体 T4 不能因为这一组通过就算完成。
+
+test('T4 · count 归一：任何脏值都收敛成非负整数', () => {
+  assert.equal(normalizeCount(0), 0);
+  assert.equal(normalizeCount(12), 12);
+  assert.equal(normalizeCount('7'), 7);
+  assert.equal(normalizeCount(' 8 '), 8);
+  // 括号内容就是历史 bug：调用点传了对象
+  assert.equal(normalizeCount({ count: 3 }), 0, '对象不能变成 [object Object] 落盘');
+  assert.equal(normalizeCount(-5), 0, '负数收敛到 0');
+  assert.equal(normalizeCount(3.7), 3, '小数截断');
+  assert.equal(normalizeCount(NaN), 0);
+  assert.equal(normalizeCount(Infinity), 0);
+  assert.equal(normalizeCount(null), 0);
+  assert.equal(normalizeCount(undefined), 0);
+});
+
+test('T4 · touch(id, count)：索引与 meta.json 落盘的都是数字', () => {
+  const { store } = tmpStore();
+  const a = store.create({ name: 'touch 表' });
+
+  assert.equal(store.touch(a.id, 5), 5, '返回归一后的值');
+
+  const entry = store.list().find((l) => l.id === a.id);
+  assert.equal(entry.count, 5);
+  assert.equal(typeof entry.count, 'number');
+  assert.equal(typeof store.meta(a.id).count, 'number');
+  assert.equal(store.meta(a.id).count, 5);
+
+  // 脏值也必须落成数字
+  store.touch(a.id, { count: 9 });
+  assert.equal(store.list().find((l) => l.id === a.id).count, 0);
+  assert.equal(store.meta(a.id).count, 0);
+  assert.equal(typeof store.meta(a.id).count, 'number');
+
+  // 磁盘上的 JSON 里不能出现字符串或对象形式的 count
+  const onDisk = JSON.parse(readFileSync(store.indexFile, 'utf8'));
+  assert.equal(typeof onDisk.lists.find((l) => l.id === a.id).count, 'number');
+});
+
+test('T4 · 空 known.txt：写真正空文本，不是 JSON 字符串', () => {
+  const { store } = tmpStore();
+  const a = store.create({ name: '空表' });
+  const file = store.knownFileOf(a.id);
+  assert.ok(existsSync(file), 'known.txt 应该被建出来');
+  const raw = readFileSync(file, 'utf8');
+  assert.equal(raw, '', '必须是零字节文本');
+  assert.notEqual(raw, '""', '不能写成 JSON 字符串');
+  assert.deepEqual(readKnownFile(file), [], '读回来是空数组');
+});
+
+test('T4 · known 读写往返 + 清空回真正空文本', () => {
+  const { store } = tmpStore();
+  const a = store.create({ name: 'known 表' });
+  assert.equal(store.writeKnown(a.id, ['b', 'a', 'c']), 3);
+  assert.deepEqual(store.known(a.id), ['b', 'a', 'c']);
+  assert.equal(store.writeKnown(a.id, []), 0);
+  assert.equal(readFileSync(store.knownFileOf(a.id), 'utf8'), '');
+  assert.deepEqual(store.known(a.id), []);
+});
+
+test('T4 · 旧数据兼容：历史遗留的 "" / JSON 数组 known 都能正确读', () => {
+  const { store } = tmpStore();
+  const a = store.create({ name: '旧表' });
+  const file = store.knownFileOf(a.id);
+
+  writeFileSync(file, '""', 'utf8');
+  assert.deepEqual(readKnownFile(file), [], '旧版 create 写出的 "" 当作空表');
+
+  writeFileSync(file, '["go","stop"]', 'utf8');
+  assert.deepEqual(readKnownFile(file), ['go', 'stop'], 'JSON 数组也能读');
+
+  writeFileSync(file, 'go\r\nstop\r\n', 'utf8');
+  assert.deepEqual(readKnownFile(file), ['go', 'stop'], 'CRLF 正常');
+
+  writeFileSync(file, 'go\rstop\r', 'utf8');
+  assert.deepEqual(readKnownFile(file), ['go', 'stop'], '老 Mac 单 \\r 也能读');
+
+  // 读旧数据不应该反向污染：已知文件还在原地没被改写
+  assert.ok(existsSync(file));
+});
+
+test('T4 · 导入默认不标掌握；只有 markKnown:true 才写 known', () => {
+  const { store } = tmpStore();
+  const text = 'go\rv.\r去\rstop\rv.\r停\r';
+
+  const plain = store.importFile({ text, name: '普通导入' });
+  assert.equal(plain.count, 2);
+  assert.equal(plain.markKnown, false);
+  assert.equal(readFileSync(store.knownFileOf(plain.id), 'utf8'), '', '默认不写任何掌握词');
+  assert.deepEqual(store.known(plain.id), []);
+
+  const marked = store.importFile({ text, name: '已掌握导入', markKnown: true });
+  assert.equal(marked.markKnown, true);
+  assert.deepEqual(store.known(marked.id), ['go', 'stop']);
+});
+
+test('T4 · 导入不标掌握后，历史掌握状态保持不变', () => {
+  const { store } = tmpStore();
+  // 先有一张「已经知道这些词」的表
+  const known = store.importFile({ text: 'go\rv.\r去\r', name: '已知词', markKnown: true });
+  assert.deepEqual(store.known(known.id), ['go']);
+
+  // 再导入一张不标掌握的表，不能动到前一张
+  const fresh = store.importFile({ text: 'stop\rv.\r停\r', name: '新表' });
+  assert.deepEqual(store.known(fresh.id), []);
+  assert.deepEqual(store.known(known.id), ['go'], '历史掌握状态不受影响');
+  assert.equal(readFileSync(store.knownFileOf(known.id), 'utf8'), 'go\n');
+});
+
+test('T4 · 回收站失败：保留词表目录、索引与 activeId，并明确报错', () => {
+  const { dir, store } = tmpStore();
+  const a = store.create({ name: '会被删的表', cards: parseWordListText('go\rv.\r去\r').cards });
+  assert.equal(store.index().activeId, a.id);
+
+  // 用一个「已存在同名目录」的花招让 rename 必然失败：
+  // 回收站目录位置放一个同名文件，Windows 上 rename 会报 EEXIST/EPERM
+  const trashDir = join(dir, 'blocked-trash');
+  mkdirSync(trashDir, { recursive: true });
+  writeFileSync(join(trashDir, 'not-a-dir'), 'x', 'utf8');
+  // 更直接：把 trashDir 指到一个「文件」上，mkdir 必然失败
+  writeFileSync(join(dir, 'trash-as-file'), 'x', 'utf8');
+
+  let err = null;
+  try {
+    store.remove(a.id, { trashDir: join(dir, 'trash-as-file', 'inner') });
+  } catch (e) { err = e; }
+
+  assert.ok(err, '回收站失败必须抛错');
+  assert.equal(err.code, 'WORDLIST_TRASH_FAILED');
+  assert.equal(err.listId, a.id);
+  assert.match(err.message, /原样保留/);
+
+  // 数据必须原封不动
+  assert.ok(existsSync(store.dirOf(a.id)), '词表目录还在');
+  assert.ok(existsSync(store.knownFileOf(a.id)), 'known.txt 还在');
+  assert.equal(store.cards(a.id).cards.length, 1, '卡片还在');
+  assert.equal(store.index().activeId, a.id, 'activeId 没变');
+  assert.equal(store.list().length, 1, '索引里那条还在');
+});
+
+test('T4 · 回收站成功的正常路径：目录挪进 .trash，索引同步移除', () => {
+  const { dir, store } = tmpStore();
+  const a = store.create({ name: '正常删除' });
+  const b = store.create({ name: '留着的' });
+  store.setActive(b.id);
+
+  const r = store.remove(a.id);
+  assert.equal(r.removed, a.id);
+  assert.equal(r.activeId, b.id, '没删激活表就不动 activeId');
+  assert.ok(r.trash, '返回回收站路径');
+  assert.ok(existsSync(r.trash), '真的挪进了回收站');
+  assert.ok(!existsSync(store.dirOf(a.id)), '原目录不在了');
+  assert.equal(store.list().length, 1);
+
+  const trashEntries = readdirSync(join(dir, 'wordlists', '.trash'));
+  assert.ok(trashEntries.some((n) => n.startsWith(a.id)), '回收站里能按 id 找到');
+});
+
+test('T4 · 回收站失败后重试成功：索引与磁盘仍然一致', () => {
+  const { dir, store } = tmpStore();
+  const a = store.create({ name: '重试表' });
+
+  // 回收站目录的位置被一个同名「文件」占住：mkdir 必然失败 → rename 也走不通
+  writeFileSync(join(dir, 'blocked-trash'), 'x', 'utf8');
+  assert.throws(
+    () => store.remove(a.id, { trashDir: join(dir, 'blocked-trash') }),
+    (e) => e.code === 'WORDLIST_TRASH_FAILED',
+  );
+  assert.equal(store.list().length, 1, '失败后索引未被改动');
+  assert.ok(existsSync(store.dirOf(a.id)), '失败后目录还在');
+
+  // 换回默认回收站就能删掉
+  const r = store.remove(a.id);
+  assert.equal(r.removed, a.id);
+  assert.equal(store.list().length, 0);
 });

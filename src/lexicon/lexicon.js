@@ -45,10 +45,14 @@ export function readJsonFile(file) {
  */
 export function loadLexicon(config, extra = {}) {
   const lex = config.lexicon ?? {};
+  const language = config.language ?? 'en';
   const missing = [];
+  // 空路径 = 这个语言没有这个文件（例如日语没有 base / pos / 词形例外），
+  // 不是「缺文件」。只有英语那几项才是硬性要求。
   const need = (label, file, loader = readWordList) => {
+    if (!file) return null;
     const v = loader(file);
-    if (v === null) missing.push({ key: label, path: file || '(未配置)' });
+    if (v === null) missing.push({ key: label, path: file });
     return v;
   };
 
@@ -87,6 +91,7 @@ export function loadLexicon(config, extra = {}) {
 
   return {
     stopwords, known, base, pos, decisions, freqRank, exceptions, dictionary, missing, lemmatize,
+    language,
     /** 口语词：Map<word, {pos, meaning, scene}> */
     colloquialWords: colloquial.words,
     /** 口语短语白名单：Map<key, {pos, meaning, scene, display}> */

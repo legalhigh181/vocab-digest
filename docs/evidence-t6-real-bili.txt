@@ -1,0 +1,45 @@
+=== A. 完整成功流程（真实 B 站 + 真 whisper + digest + Word）===
+工作目录：C:\Users\18169\AppData\Local\Temp\bili-flow-YKMhrK\成功
+OK   A1 start 立刻返回 taskId —— 22ms id=mwayncn4-jg8gg0-1
+OK   A2 取数成功 —— 取数完成：字幕 0 条，弹幕 1406 条（已参与分析），语音识别 9s
+OK   A3 转写期间服务仍可探活 —— 25 次 /api/state，最慢 8ms
+OK   A4 产物齐全 —— audio.p1.m4s audio.p1.srt danmaku.txt danmaku.xml meta.json
+OK   A5 字幕是带时间轴的 SRT —— 84 条
+OK   A6 无 .part / .lock / .tmp 残留 —— audio.p1.m4s audio.p1.srt danmaku.txt danmaku.xml meta.json
+OK   A7 无 ffmpeg 残留进程
+OK   A8 digest 成功 —— runId=20261111-012606-1q2s 运行 20261111-012606-1q2s 完成：102 个词条，自检通过
+OK   A9 词条数与语言正确 —— 102 词条 / en
+OK   A10 Word 已生成 —— 22 KB
+
+=== B. 下载阶段取消：旧产物必须一字节不变 ===
+工作目录：C:\Users\18169\AppData\Local\Temp\bili-flow-CXBfRH\取消下载（源 BV1Ks411p7Zq）
+旧产物：meta.json（06e63ff2b304…，31 字节）
+OK   B1 start 返回 taskId —— id=mwayoq5w-x7ko4t-1
+取消应答：ok；音频：未落盘；收尾码：CANCELLED
+OK   B2 取消被接受 —— 已请求取消：BV1Ks411p7Zq
+OK   B3 任务以「取消」收尾 —— CANCELLED 下载音频失败：下载被取消
+OK   B4 取消不是因为转写（确实死在取数阶段） —— CANCELLED
+OK   B5 旧 meta.json 要么原样、要么换成完整的 JSON（不是半截） —— 316 字节
+OK   B6 未留下 .part 半成品 —— meta.json
+OK   B7 未留下锁 / 临时文件 —— meta.json
+OK   B8 无 ffmpeg 残留进程
+OK   B9 没有产出半截字幕
+
+=== C. 转写阶段取消：whisper 子进程必须被杀 ===
+工作目录：C:\Users\18169\AppData\Local\Temp\bili-flow-FJY4RG\取消转写
+OK   C1 进入转写阶段（ffmpeg 在跑）
+OK   C2 取消时确认 whisper 正在跑
+OK   C3 取消被接受且任务收尾 —— 1064ms TRANSCRIBE_CANCELLED 语音识别失败：转写被取消
+OK   C4 whisper 子进程已结束
+OK   C5 取消后没有新字幕 —— audio.p1.m4s danmaku.txt danmaku.xml meta.json
+OK   C6 无 .part / .lock / .tmp 残留 —— audio.p1.m4s danmaku.txt danmaku.xml meta.json
+OK   C7 暂存目录已清空
+OK   C8 取消后服务仍正常
+
+=== D. 取消后重新启动（同一目录、同一链接）===
+OK   D1 能重新启动 —— id=mwayqqc7-fc15fa-2
+OK   D2 重启后跑完并成功 —— 取数完成：字幕 0 条，弹幕 1406 条（只保存），语音识别 9s
+OK   D3 这次真的产出字幕 —— 总耗时 11s
+OK   D4 无残留
+
+=== 全部通过 ===

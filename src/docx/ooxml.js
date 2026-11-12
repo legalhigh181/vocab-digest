@@ -24,11 +24,23 @@ export function escapeXml(s) {
 /**
  * 一个文字 run。
  * @param {string} text
- * @param {object} opts { bold, italic, size(半磅), color, font }
+ * @param {object} opts { bold, italic, size(半磅), color, font, eastAsia }
+ *
+ * `eastAsia` 单独一项：`font` 是「西文也用这个字体」，`eastAsia` 只改亚洲字形。
+ * 日文正文走 `eastAsia: 'Meiryo'`，拉丁字母仍按样式里的 Calibri 走 ——
+ * 只写 `font` 会把拼音/数字也换成日文字体，英文词条那一半就变样了。
+ * 两个都给时 eastAsia 优先（调用方显式指定亚洲字体）。
  */
 export function run(text, opts = {}) {
   const props = [];
-  if (opts.font) props.push(`<w:rFonts w:ascii="${escapeXml(opts.font)}" w:hAnsi="${escapeXml(opts.font)}" w:eastAsia="${escapeXml(opts.font)}"/>`);
+  if (opts.font || opts.eastAsia) {
+    const ascii = opts.font ? escapeXml(opts.font) : '';
+    const ea = escapeXml(opts.eastAsia ?? opts.font);
+    const attrs = [];
+    if (ascii) attrs.push(`w:ascii="${ascii}" w:hAnsi="${ascii}"`);
+    attrs.push(`w:eastAsia="${ea}"`);
+    props.push(`<w:rFonts ${attrs.join(' ')}/>`);
+  }
   if (opts.bold) props.push('<w:b/>');
   if (opts.italic) props.push('<w:i/>');
   if (opts.color) props.push(`<w:color w:val="${escapeXml(opts.color)}"/>`);
@@ -102,7 +114,7 @@ export function tocField(opts = {}) {
  * 表格。
  * @param {string[]} headers
  * @param {string[][]} rows
- * @param {object} opts { widths:number[] (缇), headerStyle, cellStyle }
+ * @param {object} opts { widths:number[] (缇), headerStyle, cellStyle, font, eastAsia }
  */
 export function table(headers, rows, opts = {}) {
   const colCount = Math.max(headers.length, ...rows.map((r) => r.length), 1);
@@ -121,7 +133,8 @@ export function table(headers, rows, opts = {}) {
   const cell = (text, isHeader) => {
     const shade = isHeader ? '<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>' : '';
     const style = `<w:pPr><w:pStyle w:val="TableText"/></w:pPr>`;
-    const body = escapeXml(text) ? run(text, { bold: isHeader }) : '';
+    // 表格里同样会有日文（词形、读音），东亚字体要跟着语言走
+    const body = escapeXml(text) ? run(text, { bold: isHeader, eastAsia: opts.eastAsia }) : '';
     return `<w:tc><w:tcPr>${shade}</w:tcPr><w:p>${style}${body}</w:p></w:tc>`;
   };
   const headerRow = `<w:tr><w:trPr><w:tblHeader/></w:trPr>${headers.map((h) => cell(h, true)).join('')}</w:tr>`;
@@ -214,7 +227,13 @@ function styleDef(id, name, opts = {}) {
   return `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/>${based}${pPrXml}${rPrXml}</w:style>`;
 }
 
-export function styles({ fontCn = '等线', fontEn = 'Calibri' } = {}) {
+export function styles({ fontCn = '等线', fontEn = 'Calibri', lang = 'zh-CN', eastAsiaLang = null } = {}) {
+  // fontCn 在这里就是「亚洲字形用哪个字体」：中文默认等线，日文由调用方传 Meiryo。
+  // 日文文档还要把 eastAsia 语言标成 ja-JP，否则 Word 会拿中文字形凑合着排假名。
+  const ea = eastAsiaLang
+    ? escapeXml(eastAsiaLang)
+    : escapeXml(lang ?? 'zh-CN');
+  const langXml = `<w:lang w:val="en-US" w:eastAsia="${ea}"/>`;
   const body = styleDef('Normal', 'Normal', {
     font: fontEn, fontCn, size: 21,
     spacing: '<w:spacing w:line="320" w:lineRule="auto" w:after="80"/>',
@@ -262,7 +281,7 @@ export function styles({ fontCn = '等线', fontEn = 'Calibri' } = {}) {
   return XML_DECL + `<w:styles xmlns:w="${NS_W}">`
     + '<w:docDefaults><w:rPrDefault><w:rPr>'
     + `<w:rFonts w:ascii="${fontEn}" w:hAnsi="${fontEn}" w:eastAsia="${fontCn}" w:cs="${fontEn}"/>`
-    + '<w:sz w:val="21"/><w:szCs w:val="21"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/>'
+    + `<w:sz w:val="21"/><w:szCs w:val="21"/>${langXml}`
     + '</w:rPr></w:rPrDefault>'
     + '<w:pPrDefault><w:pPr><w:spacing w:after="80"/></w:pPr></w:pPrDefault>'
     + '</w:docDefaults>'
@@ -300,12 +319,12 @@ export function document(bodyXml) {
 }
 
 /** 包内全部部件；links 为文档里的外部超链接 */
-export function buildParts(documentXml, { title, fontCn, fontEn, created, links } = {}) {
+export function buildParts(documentXml, { title, fontCn, fontEn, lang, eastAsiaLang, created, links } = {}) {
   return [
     { name: '[Content_Types].xml', data: contentTypes() },
     { name: '_rels/.rels', data: rels() },
     { name: 'word/document.xml', data: documentXml },
-    { name: 'word/styles.xml', data: styles({ fontCn, fontEn }) },
+    { name: 'word/styles.xml', data: styles({ fontCn, fontEn, lang, eastAsiaLang }) },
     { name: 'word/settings.xml', data: settings() },
     { name: 'word/numbering.xml', data: numbering() },
     { name: 'word/_rels/document.xml.rels', data: documentRels(links) },

@@ -31,7 +31,7 @@ import { TAG_DIMENSIONS, TAG_DIM_LABELS } from './classify.js';
 import { resolveConfig } from './config.js';
 import { ensureData } from './data/seed.js';
 import { batchesOf, exportTagView, filterItems, loadRunDigest } from './export.js';
-import { listRuns, localIso, readDecisions, renderRun, runDigest, wordlistFromRun } from './run.js';
+import { listRuns, localIso, readDecisions, renderRun, runDigest, runDigestAsync, wordlistFromRun } from './run.js';
 import { stablePretty } from './util.js';
 import { WordlistStore } from './wordlists/store.js';
 
@@ -49,6 +49,8 @@ function overridesOf(config = {}) {
   const o = {};
   if (config.dataDir) o.dataDir = config.dataDir;
   if (config.runRoot) o.runRoot = config.runRoot;
+  // 语言：en / ja（jp 归一为 ja），非法值由 normalizeLanguage 抛 INVALID_LANGUAGE
+  if (config.language) o.language = String(config.language);
   if (config.minLen != null) o.lexicon = { ...(o.lexicon ?? {}), minLen: Number(config.minLen) };
   if (config.minFreq != null) o.lexicon = { ...(o.lexicon ?? {}), minFreq: Number(config.minFreq) };
   if (config.by) o.classify = { ...(o.classify ?? {}), by: String(config.by).split(',').map((s) => s.trim()).filter(Boolean) };
@@ -229,8 +231,10 @@ export async function apply(ctx, config = {}) {
       type: 'object',
       properties: {
         inputs: { type: 'array', items: { type: 'string' }, description: '文件或目录列表（必填）' },
-        runId: { type: 'string', description: '指定运行 id（默认按时间生成）' },
+        runId: { type: 'string', description: '指定运行 id（默认按时间生成）。id 已存在时会报冲突，不覆盖' },
+        overwrite: { type: 'boolean', description: '允许覆盖已存在的 runId 目录（默认不允许；正被其他任务占用的目录一律不许覆盖）' },
         title: { type: 'string', description: '文档标题（默认「英语词汇整理 · <输入目录名>」）' },
+        language: { type: 'string', description: '分析语言：en（英文，默认）或 ja（日文，需 kuromoji）' },
         by: { type: 'string', description: '分章标签维度，逗号分隔：pos,difficulty,source,freq' },
         minLen: { type: 'integer', description: '最短词长' },
         minFreq: { type: 'integer', description: '最低词频' },
@@ -280,25 +284,43 @@ export async function apply(ctx, config = {}) {
             },
           },
           warnings: { type: 'array', items: { type: 'string' } },
+          language: { type: 'string' },
           rendered: { type: 'string' },
         },
-        required: ['ok', 'runId', 'runDir', 'digestFile', 'stats', 'tags', 'top', 'warnings', 'rendered'],
+        required: ['ok', 'runId', 'runDir', 'digestFile', 'stats', 'tags', 'top', 'warnings', 'language', 'rendered'],
         additionalProperties: false,
       },
       (v) => v.rendered,
     ),
     async execute(args = {}) {
       const ov = overridesOf(cfg);
+      if (args.language) ov.language = String(args.language);
       if (args.minLen != null) ov.lexicon = { ...(ov.lexicon ?? {}), minLen: Number(args.minLen) };
       if (args.minFreq != null) ov.lexicon = { ...(ov.lexicon ?? {}), minFreq: Number(args.minFreq) };
       if (args.by) ov.classify = { ...(ov.classify ?? {}), by: String(args.by).split(',').map((s) => s.trim()).filter(Boolean) };
-      const meta = runDigest({
+      const runOpts = {
         inputs: (args.inputs ?? []).map((p) => resolve(String(p))),
         cwd: cfg.cwd || process.cwd(),
         runId: args.runId,
+        overwrite: args.overwrite === true,
         title: args.title,
         configOverrides: ov,
-      });
+      };
+      // 日文管线需要先异步加载 kuromoji，英文仍走同步路径
+      const wantJa = String(ov.language ?? '').toLowerCase() === 'ja' || String(ov.language ?? '').toLowerCase() === 'jp';
+      let meta;
+      try {
+        meta = wantJa ? await runDigestAsync(runOpts) : runDigest(runOpts);
+      } catch (e) {
+        if (e.code === 'INVALID_LANGUAGE') throw new Error(`不支持的语言：${args.language}（只接受 en / ja）`);
+        if (e.code === 'RUN_DIR_CONFLICT') {
+          const why = e.reason === 'busy'
+            ? '这个运行目录正有任务在跑，不能覆盖'
+            : '这个 runId 已经有结果了；要覆盖请显式传 overwrite=true';
+          throw new Error(`运行目录冲突：${e.runId ?? args.runId}（${why}）`);
+        }
+        throw e;
+      }
       const dig = JSON.parse(readFileSync(meta.outputs.digest, 'utf8'));
       const tags = {};
       for (const dim of TAG_DIMENSIONS) {
@@ -307,7 +329,7 @@ export async function apply(ctx, config = {}) {
       const top = (dig.topWords ?? []).slice(0, 15).map((w) => ({ word: w.display ?? w.word, pos: w.pos ?? '', count: w.count ?? 0 }));
       const warnings = (meta.warnings ?? []).map((w) => `${w.level}: ${w.src ? `${w.src}: ` : ''}${w.message}`);
       const lines = [
-        `【词汇整理｜收集】运行 ${meta.runId}（${(meta.elapsedMs / 1000).toFixed(1)}s）`,
+        `【词汇整理｜收集】运行 ${meta.runId}（${(meta.elapsedMs / 1000).toFixed(1)}s · 语言 ${meta.language})`,
         `  输入 ${meta.stats.fileCount} 个文件 / ${meta.stats.fragmentCount} 条片段`,
         `  收录 ${meta.stats.keptCount} 个词条，过滤 ${meta.stats.filteredCount} 个，短语 ${meta.stats.phraseCount} 个`,
         `  中间结果: ${meta.outputs.digest}`,
@@ -320,7 +342,7 @@ export async function apply(ctx, config = {}) {
         '',
         '下一步: vocab_translate（可选，补中文释义）→ vocab_build_docx',
       ];
-      logger.info(`[vocab-digest] collect ${meta.runId}: ${meta.stats.keptCount} words`);
+      logger.info(`[vocab-digest] collect ${meta.runId}: ${meta.stats.keptCount} words (${meta.language})`);
       return {
         ok: true,
         runId: meta.runId,
@@ -330,6 +352,7 @@ export async function apply(ctx, config = {}) {
         tags,
         top,
         warnings,
+        language: meta.language ?? 'en',
         rendered: lines.join('\n'),
       };
     },
@@ -489,6 +512,11 @@ export async function apply(ctx, config = {}) {
         runDir: { type: 'string', description: '运行目录绝对路径' },
         by: { type: 'string', description: '覆盖分章标签维度：pos / difficulty / source / freq，逗号分隔多选' },
         title: { type: 'string', description: '覆盖文档标题' },
+        language: {
+          type: 'string',
+          enum: ['en', 'ja'],
+          description: '覆盖文档语言（默认跟随这次运行的 digest.json）。只影响标题前缀、亚洲字体与语言标记，不重新分词',
+        },
       },
       additionalProperties: false,
     },
@@ -540,12 +568,14 @@ export async function apply(ctx, config = {}) {
       }
       const configOverrides = overridesOf(cfg);
       if (args.by) configOverrides.classify = { ...(configOverrides.classify ?? {}), by: String(args.by).split(',').map((s) => s.trim()).filter(Boolean) };
+      // language 只改文档呈现（标题前缀 / eastAsia 字体 / w:lang），不动分词结果
+      if (args.language) configOverrides.language = String(args.language);
 
       const r = renderRun({
         runDir,
         cwd: cfg.cwd || process.cwd(),
         dataDirOverride: cfg.dataDir,
-        configOverrides: args.by ? configOverrides : undefined,
+        configOverrides: (args.by || args.language) ? configOverrides : undefined,
         title: args.title,
       });
       const dig = JSON.parse(readFileSync(join(runDir, 'digest.json'), 'utf8'));
@@ -751,6 +781,8 @@ export async function apply(ctx, config = {}) {
         duration: { type: 'number', description: '只转这一段，时长秒' },
         gpu: { type: 'boolean', description: '是否用 GPU，默认 true' },
         model: { type: 'string', description: '模型文件名或路径，默认 ggml-small.bin' },
+        timeoutMs: { type: 'number', description: '超时毫秒数（默认按 duration 估算，未给则 30 分钟）' },
+        overwrite: { type: 'boolean', description: '允许覆盖已存在的同名字幕（默认不允许：已有字幕直接报冲突，旧文件原样保留）' },
       },
       required: ['input'],
       additionalProperties: false,
@@ -777,16 +809,25 @@ export async function apply(ctx, config = {}) {
     async execute(args = {}) {
       const cwd = cfg.cwd || process.cwd();
       const input = resolve(cwd, String(args.input));
-      const r = transcribe({
-        input,
-        out: args.out ? resolve(cwd, String(args.out)) : undefined,
-        language: args.language ? String(args.language) : 'en',
-        start: args.start != null ? Number(args.start) : undefined,
-        duration: args.duration != null ? Number(args.duration) : undefined,
-        gpu: args.gpu !== false,
-        model: args.model ? String(args.model) : cfg.model,
-        cwd,
-      });
+      // 异步子进程：长时间转写期间工具调用方（DSH/Web）仍然能响应探活
+      let r;
+      try {
+        r = await transcribe({
+          input,
+          out: args.out ? resolve(cwd, String(args.out)) : undefined,
+          language: args.language ? String(args.language) : 'en',
+          start: args.start != null ? Number(args.start) : undefined,
+          duration: args.duration != null ? Number(args.duration) : undefined,
+          gpu: args.gpu !== false,
+          model: args.model ? String(args.model) : cfg.model,
+          cwd,
+          timeoutMs: args.timeoutMs != null ? Number(args.timeoutMs) : undefined,
+          overwrite: args.overwrite === true,
+        });
+      } catch (e) {
+        // 明确错误码：调用方据此给处置建议，不要只说「失败了」
+        throw new Error(`${e.messageZh ?? '转写失败'}（${e.code ?? 'UNKNOWN'}）：${e.message}`);
+      }
       const lines = [
         '【词汇整理｜语音转写】',
         `  输入: ${r.input}`,
@@ -815,6 +856,7 @@ export async function apply(ctx, config = {}) {
         link: { type: 'string', description: 'B 站视频地址、BV 号或 av 号（可带 ?p=2 分 P）' },
         page: { type: 'integer', description: '分 P 序号，默认按链接/1' },
         withDanmaku: { type: 'boolean', description: '弹幕是否也当分析输入，默认 false（只存不用）' },
+        fetchDanmaku: { type: 'boolean', description: '是否下载弹幕文件，默认 true（设 false 就完全不取弹幕）' },
         asr: { type: 'boolean', description: '没有字幕时是否自动语音识别，默认 true' },
         model: { type: 'string', description: '语音识别模型文件名或路径，默认 ggml-small.bin' },
         out: { type: 'string', description: '输出目录（默认 samples/<bvid>.p<页>）' },
@@ -849,9 +891,13 @@ export async function apply(ctx, config = {}) {
         link: String(args.link ?? ''),
         cwd,
         page: args.page != null ? Number(args.page) : undefined,
+        fetchDanmaku: args.fetchDanmaku !== false,
         asr: args.asr !== false,
         withDanmaku: args.withDanmaku === true,
         model: args.model ? String(args.model) : cfg.model,
+        // 语言必须一路传到转写：不传的话 fetchVideo 会按 en 转日语人声，产出英文 SRT，
+        // 再交给日文分词就是 0 个词条（2026-11-11 用 BV1KE4p6CERE 复现过）
+        language: args.language ? String(args.language) : cfg.language,
         outDir: args.out ? resolve(cwd, String(args.out)) : undefined,
         log: (m) => logs.push(String(m)),
       });
@@ -862,14 +908,17 @@ export async function apply(ctx, config = {}) {
           inputs: [], rendered: lines.join('\n'),
         };
       }
+      const dmText = r.danmakuInfo?.ok
+        ? `${r.danmaku} 条${r.withDanmaku ? '（已参与分析）' : '（只保存不参与分析）'}${r.danmakuInfo.warning ? ` ⚠ ${r.danmakuInfo.warning}` : ''}`
+        : `未取到（${r.danmakuInfo?.error ?? '已跳过'}）`;
       const lines = [
         '【词汇整理｜B 站取数】',
-        `  视频: ${r.info?.title ?? ''}（${r.info?.bvid ?? ''} p${r.page}）`,
+        `  视频: ${r.info?.title ?? ''}（${r.info?.bvid ?? ''} 第 ${r.page}/${r.totalPages} P${r.pageTitle ? ` · ${r.pageTitle}` : ''}）`,
         `  目录: ${r.dir}`,
-        `  字幕 ${r.subtitle} 条 · 弹幕 ${r.danmaku} 条${r.asr ? ` · 语音识别 ${r.asr.seconds}s` : ''}`,
-        ...(r.withDanmaku ? [] : ['  弹幕只保存不参与分析（要一起分析就加 withDanmaku）']),
+        `  跳转: ${r.playUrl}`,
+        `  字幕 ${r.subtitle} 条 · 弹幕 ${dmText}${r.asr ? ` · 语音识别 ${r.asr.seconds}s` : ''}`,
         '',
-        '下一步: vocab_collect，inputs 传下面这些文件。',
+        '下一步: vocab_collect，inputs 传下面这些文件（都是真实存在的路径）。',
         ...(r.inputs ?? []).map((p) => `  ${p}`),
       ];
       return {

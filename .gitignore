@@ -27,6 +27,10 @@ samples/
 data/wordlists/
 # data/known/known.txt 是已掌握词（个人进度）
 data/known/known.txt
+# data/ja/known.txt 是日语已掌握词（同样是个人的）
+data/ja/known.txt
+# 本机路径 / 个人配置
+config.local.json
 
 # 调试与临时文件
 scratch-*

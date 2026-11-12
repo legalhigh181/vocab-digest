@@ -11,9 +11,9 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { prepareConfig, readDecisions, renderRun, runDigest, listRuns } from './run.js';
+import { prepareConfig, readDecisions, renderRun, runDigest, runDigestAsync, listRuns } from './run.js';
 import { exportTagView, loadRunDigest, renderTagView, writeTranslateBatches } from './export.js';
-import { checkWhisper, resolveModel, transcribe } from './asr.js';
+import { checkWhisper, resolveModel, transcribeSync } from './asr.js';
 import { fetchVideo } from './fetch.js';
 import { stablePretty } from './util.js';
 import { parseArgs } from './cli-args.js';
@@ -48,12 +48,13 @@ const USAGE = `用法：vocab-english <命令> [选项] [输入...]
   --wordlist <id>    digest 用哪张词表（把它的释义并进来，并过滤掉已掌握的词）
   --out <srt>        transcribe 输出路径（默认同目录同名 .srt）
   --model <name>     whisper 模型（默认 ggml-small.bin，放在 models/ 下）
-  --language <code>  transcribe 语言（默认 en）
+  --language <code>  transcribe 语言 / digest 分析语言（en 或 ja，默认 en）
   --start/--duration transcribe 只转一段（秒）
   --no-gpu           transcribe 强制走 CPU
   --page <n>         fetch 取第几个分 P（默认 1）
-  --no-danmaku       fetch 不取弹幕
-  --with-danmaku     fetch 把弹幕也一起交给 digest（默认只保存不分析）
+  --no-danmaku       fetch 不下载弹幕（两个开关的第一个）
+  --with-danmaku     fetch 把下载到的弹幕也交给 digest（默认只保存不分析，第二个开关）
+  --concurrency N    弹幕分片并发上限（默认 4）
   --no-asr           fetch 取不到字幕时不转音频识别，直接报错
   --json             以 JSON 输出（给程序调用）
 `;
@@ -69,6 +70,11 @@ function configOverrides(args) {
   if (args['min-freq'] != null) o.lexicon = { ...(o.lexicon ?? {}), minFreq: Number(args['min-freq']) };
   if (args.by != null) o.classify = { ...(o.classify ?? {}), by: String(args.by).split(',').map((s) => s.trim()).filter(Boolean) };
   return o;
+}
+
+/** 语言参数：缺省交给配置；非法值由 normalizeLanguage 抛 INVALID_LANGUAGE */
+function languageOf(args) {
+  return args.lang ?? args.language ?? undefined;
 }
 
 /** 从参数里收集 by-tag 的过滤条件 */
@@ -111,34 +117,41 @@ export async function main(argv = process.argv.slice(2)) {
           link,
           cwd,
           page: args.page ? Number(args.page) : undefined,
-          danmaku: args['no-danmaku'] ? false : true,
+          // 抓不抓弹幕 / 抓到的弹幕用不用，是两个开关
+          fetchDanmaku: !args['no-danmaku'],
           withDanmaku: Boolean(args['with-danmaku']),
           asr: args['no-asr'] ? false : true,
           model: args.model,
+          language: languageOf(args),
+          concurrency: args.concurrency ? Number(args.concurrency) : undefined,
           log: (m) => {
             if (!asJson) process.stderr.write(`  · ${m}\n`);
           },
         });
         if (!r.ok) {
-          out(`取数失败：${r.error}`, { ok: false, error: r.error, dir: r.dir, danmakuFile: r.danmakuFile }, asJson);
+          out(`取数失败：${r.error}`, { ok: false, error: r.error, dir: r.dir, danmaku: r.danmaku }, asJson);
           return 4;
         }
+        const dmNote = r.danmakuInfo?.ok
+          ? `${r.danmaku} 条${r.withDanmaku ? '（已参与分析）' : '（只保存不参与分析）'}${r.danmakuInfo.warning ? ` ⚠ ${r.danmakuInfo.warning}` : ''}`
+          : `失败：${r.danmakuInfo?.error ?? '未抓取'}`;
         const human = [
-          `已取到：《${r.info.title}》`,
+          `已取到：《${r.info.title}》 第 ${r.page}/${r.totalPages} P`,
           `  目录：${r.dirRel}`,
-          `  台词 ${r.subtitle} 条${r.asr ? ` · 语音识别 ${r.asr.seconds}s` : ''} · 弹幕 ${r.danmaku} 条${r.danmakuFile ? `（单独存成 ${r.danmakuFile}）` : ''}`,
-          ...(r.inputs.length ? [`  下一步：vocab-english digest ${r.inputs.join(' ')}`] : []),
+          `  台词 ${r.subtitle} 条${r.asr ? ` · 语音识别 ${r.asr.seconds}s` : ''} · 弹幕 ${dmNote}`,
+          `  跳转：${r.playUrl}`,
+          ...(r.inputsRel.length ? [`  下一步：vocab-english digest ${r.inputsRel.join(' ')}`] : []),
         ].join('\n');
         out(human, r, asJson);
         return 0;
       }
 
       case 'init': {
-        const { config, createdFiles } = prepareConfig({ cwd, dataDirOverride: args['data-dir'] });
+        const { config, createdFiles } = prepareConfig({ cwd, dataDirOverride: args['data-dir'], language: languageOf(args) });
         const human = createdFiles.length
-          ? `已初始化词表：\n${createdFiles.map((f) => `  + ${f}`).join('\n')}`
+          ? `已初始化词表（${config.language}）：\n${createdFiles.map((f) => `  + ${f}`).join('\n')}`
           : `词表已存在，未改动：${config.dataDir}`;
-        out(human, { dataDir: config.dataDir, created: createdFiles, missing: config.missingFiles }, asJson);
+        out(human, { dataDir: config.dataDir, language: config.language, created: createdFiles, missing: config.missingFiles }, asJson);
         return 0;
       }
 
@@ -147,17 +160,39 @@ export async function main(argv = process.argv.slice(2)) {
           out(USAGE, { error: 'missing-input' }, asJson);
           return 2;
         }
-        const meta = runDigest({
+        const lang = languageOf(args);
+        const metaOpts = {
           inputs: positional.map((p) => resolve(cwd, p)),
           cwd,
           runId: args['run-id'],
+          // 显式给 --force 才允许覆盖已有的运行目录；默认冲突即停
+          overwrite: args.force === true,
           title: args.title,
           wordlist: args.wordlist,
           dataDirOverride: args['data-dir'],
+          language: lang,
           configOverrides: configOverrides(args),
-        });
+        };
+        // 日文要先加载分词器（异步），走 Async 版；英文保持原有同步路径不变
+        let meta;
+        try {
+          meta = lang === 'ja' ? await runDigestAsync(metaOpts) : runDigest(metaOpts);
+        } catch (e) {
+          if (e.code === 'RUN_DIR_CONFLICT') {
+            const why = e.reason === 'busy'
+              ? '这个运行目录正有任务在跑，不能覆盖'
+              : '这个 runId 已经有结果了；要用 --force 才覆盖';
+            out(`运行目录冲突：${e.runId ?? args['run-id']}（${why}）`, { error: 'run-dir-conflict', runId: e.runId }, asJson);
+            return 2;
+          }
+          if (e.code === 'INVALID_LANGUAGE') {
+            out(e.message, { error: 'invalid-language' }, asJson);
+            return 2;
+          }
+          throw e;
+        }
         const human = [
-          `运行 ${meta.runId} 完成（${(meta.elapsedMs / 1000).toFixed(1)}s）`,
+          `运行 ${meta.runId} 完成（${(meta.elapsedMs / 1000).toFixed(1)}s，语言 ${meta.language}）`,
           `  输入 ${meta.stats.fileCount} 个文件 / ${meta.stats.fragmentCount} 条片段`,
           `  收录 ${meta.stats.keptCount} 个词条，过滤 ${meta.stats.filteredCount} 个${meta.stats.phraseCount ? `，短语 ${meta.stats.phraseCount}` : ''}`,
           `  文档 ${meta.outputs.docx}`,
@@ -256,7 +291,7 @@ export async function main(argv = process.argv.slice(2)) {
         const results = [];
         for (const p of positional) {
           const input = resolve(cwd, p);
-          const r = transcribe({
+          const r = transcribeSync({
             input,
             out: positional.length === 1 ? args.out : undefined,
             start: args.start != null ? Number(args.start) : undefined,
@@ -264,6 +299,8 @@ export async function main(argv = process.argv.slice(2)) {
             language: args.language ? String(args.language) : 'en',
             gpu: !args['no-gpu'],
             model: args.model ? String(args.model) : undefined,
+            // 默认不覆盖：已有字幕就报冲突，旧文件一个字节都不动
+            overwrite: args.force === true,
           });
           results.push(r);
         }
@@ -291,6 +328,8 @@ export async function main(argv = process.argv.slice(2)) {
     const payload = { error: e.code ?? 'ERROR', message: e.message, ...(e.missing ? { missing: e.missing } : {}) };
     if (asJson) out(null, payload, true);
     else process.stderr.write(`出错：${e.message}\n`);
-    return e.code === 'LEXICON_MISSING' ? 3 : 1;
+    if (e.code === 'LEXICON_MISSING') return 3;
+    if (e.code === 'INVALID_LANGUAGE') return 2;
+    return 1;
   }
 }

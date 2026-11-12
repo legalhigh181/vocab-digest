@@ -1,0 +1,8 @@
+ffmpeg 有 whisper 滤镜: true（filters 可读）
+模型存在: true（465 MB）
+checkWhisper: ok=true code=- message=whisper 可用
+裁音频: exit=0 → C:\Users\18169\AppData\Local\Temp\whisper-probe-ebKKff\clip.wav
+transcribe: 成功（360 字节）用时 2.8s 条目=7
+头几行: 0 / 00:00:00,000 --> 00:00:02,000 / (字幕製作:貝爾) /  / 1 / 00:00:02,944 --> 00:00:05,944
+结果是 SRT: true
+英文专用模型判定（voice.en.bin）: true

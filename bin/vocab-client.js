@@ -110,10 +110,17 @@ function openWindow(browser) {
 
 async function main() {
   // ── exe 模式 + --server：直接把自己变成服务端 ──
+  // 注意：SEA 单文件里只有 client 的代码，服务端代码还是从磁盘上的 src/ 读，
+  // 所以这里用动态 import；相对路径按 bin/ 目录算。
   if (isSea && serverOnly) {
-    const { startApp } = await import('./app-entry.js');
-    const app = await startApp({ cwd: root, port, host: '127.0.0.1' });
-    process.on('SIGTERM', () => app.server.close());
+    const { serve } = await import('./app-entry.js');
+    const app = await serve({ root, port });
+    const stop = () => {
+      try { app.server.close(); } catch { /* 已经关了 */ }
+      process.exit(0);
+    };
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
     return;
   }
 

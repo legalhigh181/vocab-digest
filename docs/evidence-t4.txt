@@ -1,0 +1,111 @@
+﻿
+============================================================
+① 本地 JSON 查询，同形异读词
+============================================================
+provider.status = ok, count = 3
+  日本 / ニホン / prop. -> 日本（にほん读法）
+  日本 / ニッポン / prop. -> 日本（にっぽん读法）
+  日本 / ニホーン / prop. -> (未命中)
+  東京 / トウキョウ / prop. -> 东京（通配：不限读音词性）
+  東京 / トウキョー / n. -> 东京（通配：不限读音词性）
+结论：同一个词形按读音分开命中，不串项；通配条目对任意读音/词性都能兜底。
+
+============================================================
+①b 本地 TSV 查询
+============================================================
+解析出 4 条：
+  勉強する / ベンキョウスル / v. -> 学习，用功
+  走る / ハシル / v. -> 跑
+  走る / ハシル / v. -> （赛跑）跑
+  ねこ / ネコ / n. -> 猫
+TSV lookup 走る = 跑
+
+============================================================
+② 优先级：人工修订 > 当前词表 > provider
+============================================================
+只有词表+provider   -> 词表里的意思（来源 wordlist）
+加上人工修订        -> 人工改过的意思（来源 revision）
+人工修订为空串      -> 词表里的意思（来源 wordlist，空串不算修订）
+词表释义为空串      -> 跑（来源 provider，空串不算有释义）
+只有 provider       -> 跑（来源 provider）
+
+============================================================
+③ 未配置 / 未命中 / 加载失败
+============================================================
+未配置：status=unconfigured, 命中=false
+加载失败：status=failed, error=LOAD_FAILED
+未命中：found=false
+汇总提示（2 条词都没释义）→ 1 条提示，不是逐词刷屏：
+  - 没有配置释义来源：本次 2/2 个词条没有释义。可以放一份 data/ja/meanings.json（或用词表里已有的释义）来补。
+缺释义仍可导出：见 ④ 里 cardsToText 的输出（meaning 为空不影响卡片写入）。
+
+============================================================
+④ 字段往返保留：entryKey / 读音 / 释义语言与来源 / 掌握状态
+============================================================
+建立词表「词表 2026-11-10」：3 张卡片，掌握 1 个
+
+-- ① 卡片原样 --
+  word=日本 entryKey=ja|日本|ニホン|prop.
+    reading=ニホン hira=にほん pos=prop. posDetail=固有名詞 unknown=false lemmaSource=dict
+    sense: 日本（にほん读法） / lang=zh / src=provider
+  word=日本 entryKey=ja|日本|ニッポン|prop.
+    reading=ニッポン hira=にっぽん pos=prop. posDetail=固有名詞 unknown=false lemmaSource=dict
+    sense: 日本（にっぽん读法） / lang=zh / src=provider
+  word=Vtuber entryKey=ja|Vtuber|?|prop.
+    reading= hira= pos=prop. posDetail=* unknown=true lemmaSource=surface
+    sense: (空) / lang= / src=none
+  掌握状态 known = ["日本"]
+
+-- 备份 --
+  写出 C:\Users\18169\AppData\Local\Temp\t4-evidence-sun1iC\bak.json（3 张卡，掌握 1 个）
+
+-- ② 备份还原后的卡片 --
+  word=日本 entryKey=ja|日本|ニホン|prop.
+    reading=ニホン hira=にほん pos=prop. posDetail=固有名詞 unknown=false lemmaSource=dict
+    sense: 日本（にほん读法） / lang=zh / src=provider
+  word=日本 entryKey=ja|日本|ニッポン|prop.
+    reading=ニッポン hira=にっぽん pos=prop. posDetail=固有名詞 unknown=false lemmaSource=dict
+    sense: 日本（にっぽん读法） / lang=zh / src=provider
+  word=Vtuber entryKey=ja|Vtuber|?|prop.
+    reading= hira= pos=prop. posDetail=* unknown=true lemmaSource=surface
+    sense: (空) / lang= / src=none
+  掌握状态 known = ["日本"]
+
+-- 导出文本 --
+  #ja ja\|日本\|ニホン\|prop. 读音：ニホン 词性：prop. 词性细节：固有名詞 假名：にほん
+  日本
+  prop.
+  日本（にほん读法）
+  #ja ja\|日本\|ニッポン\|prop. 读音：ニッポン 词性：prop. 词性细节：固有名詞 假名：にっぽん
+  日本
+  prop.
+  日本（にっぽん读法）
+  #ja ja\|Vtuber\|?\|prop. 词性：prop. 词性细节：* 未知：1
+  Vtuber
+  prop.
+  
+
+-- ③ 再导入后的卡片 --
+  word=日本 entryKey=ja|日本|ニホン|prop.
+    reading=ニホン hira=にほん pos=prop. posDetail=固有名詞 unknown=undefined lemmaSource=undefined
+    sense: 日本（にほん读法） / lang=undefined / src=undefined
+  word=日本 entryKey=ja|日本|ニッポン|prop.
+    reading=ニッポン hira=にっぽん pos=prop. posDetail=固有名詞 unknown=undefined lemmaSource=undefined
+    sense: 日本（にっぽん读法） / lang=undefined / src=undefined
+  word=vtuber entryKey=ja|Vtuber|?|prop.
+    reading=undefined hira=undefined pos=prop. posDetail=* unknown=true lemmaSource=surface
+    sense: (空) / lang=undefined / src=undefined
+  掌握状态 known = []（导入默认不标掌握）
+
+-- ④ 重渲染（digest 条目 → 卡片）后的字段 --
+  word=日本 entryKey=ja|日本|ニホン|prop.
+    reading=ニホン hira=にほん pos=prop. posDetail=固有名詞 unknown=false lemmaSource=dict
+    sense: 日本（にほん读法） / lang=zh / src=provider
+  word=日本 entryKey=ja|日本|ニッポン|prop.
+    reading=ニッポン hira=にっぽん pos=prop. posDetail=固有名詞 unknown=false lemmaSource=dict
+    sense: 日本（にっぽん读法） / lang=zh / src=provider
+  word=Vtuber entryKey=ja|Vtuber|?|prop.
+    reading= hira= pos=prop. posDetail=* unknown=true lemmaSource=surface
+    sense: (空) / lang=undefined / src=undefined
+
+完成。

@@ -1,4 +1,5 @@
 {
+  "language": "en",
   "runRoot": "runs",
   "outDir": "out",
   "dataDir": "data",
@@ -23,8 +24,6 @@
     "unknownBatchSize": 40
   },
   "docx": {
-    "titlePrefix": "英语词汇整理",
-    "fontCn": "等线",
     "fontEn": "Calibri",
     "toc": true,
     "samplePerWord": 3,

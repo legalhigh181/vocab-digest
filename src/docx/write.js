@@ -22,6 +22,9 @@ export function renderDocx(doc, opts = {}) {
     title: doc.title,
     fontCn: opts.fontCn,
     fontEn: opts.fontEn,
+    // 语言相关的排版：fontCn 在这里是「亚洲字形字体」，eastAsiaLang 是 styles 里的 w:lang
+    lang: opts.lang,
+    eastAsiaLang: opts.eastAsiaLang,
     created: opts.fixedTimestamp === false ? new Date() : FIXED_DATE,
     links: linkList,
   });

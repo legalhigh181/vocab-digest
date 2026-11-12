@@ -6,6 +6,7 @@
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { JA_README, JA_STOPWORDS } from './ja-seed.js';
 
 /** 停用词：功能词 + 弹幕高频噪声 */
 export const STOPWORDS = `# 停用词表：一行一个，# 开头为注释。这些词不会进入词汇正文。
@@ -253,10 +254,31 @@ export function builtinPos() {
 
 /**
  * 保证 data/ 目录结构存在。幂等：已存在的文件不动。
+ *
+ * 按语言初始化：英语只要原来的那套；日语只建 data/ja/ 下的文件，
+ * 绝不因为切到日语就去要求英文词表齐全。
+ *
+ * @param {string} dataDir
+ * @param {object} [opts] { language: 'en'|'ja' } 缺省 en
  * @returns {string[]} 新建的文件列表
  */
-export function ensureData(dataDir) {
+export function ensureData(dataDir, opts = {}) {
   const created = [];
+  const language = opts.language === 'ja' ? 'ja' : 'en';
+
+  if (language === 'ja') {
+    const jaDir = join(dataDir, 'ja');
+    const jaKnown = join(jaDir, 'known.txt');
+    if (!existsSync(jaKnown)) {
+      mkdirSync(dirname(jaKnown), { recursive: true });
+      writeFileSync(jaKnown, '# 已掌握的日文词：一行一个原形（如 食べる）。出现在这里的不进正文。\n', 'utf8');
+      created.push(jaKnown);
+    }
+    writeIfAbsent(join(jaDir, 'stopword.txt'), JA_STOPWORDS, created);
+    writeIfAbsent(join(jaDir, 'README.md'), JA_README, created);
+    return created;
+  }
+
   const knownFile = join(dataDir, 'known', 'known.txt');
   if (!existsSync(knownFile)) {
     mkdirSync(dirname(knownFile), { recursive: true });

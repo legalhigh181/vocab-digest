@@ -1,0 +1,59 @@
+发布包：C:\Users\18169\Documents\工作区 2\vocab-digest\build\UI 最终验收-1794464834675
+文件数：1392
+
+[包内结构]
+  ✔ 21 个关键文件齐全
+  ✔ kuromoji 词典 12 个文件，共 16.97 MB（解压即可离线分词）
+
+[不夹带个人数据]
+  ✔ 1392 个文件里没有运行记录 / 个人词表 / 词典 / 模型 / Cookie / 临时文件
+    解压后共 27.21 MB
+  ✔ 文件名全部用正斜杠分隔（Windows / macOS / Linux 解压一致）
+
+[个人进度为空模板]
+  ✔ data/known/known.txt 只有注释，没有个人进度
+  ✔ data/ja/known.txt 只有注释，没有个人进度
+
+[无开发机绝对路径]
+  ✔ 扫了 55 个文件，没有开发机绝对路径
+
+[依赖与 lock 一致]
+  ✔ 生产依赖只有 kuromoji@0.1.2
+  ✔ 5 个依赖包与 lock 完全一致
+  ✔ 第三方许可清单覆盖全部依赖
+  ✔ 每个依赖包内都带许可证原文
+
+[离线分词（kuromoji 随包词典）]
+
+[英文 digest]
+  ✔ digest.language = en
+  ✔ 抽出 19 个词条（没有 ecdict.csv 也能跑，只是没有中文释义）
+
+[日文 digest + 读音]
+  ✔ digest.language = ja
+  ✔ 6 个词条，entryKey 全部以 ja| 开头
+  ✔ 6/6 个词条带片假名读音，例如 勉強する → ベンキョウスル
+  ✔ 平假名也写了，例如 べんきょうする
+
+[Word 导出（日文排版）]
+  ✔ docx 已生成：6 KB
+  ✔ 标题前缀：日语词汇整理
+  ✔ w:eastAsia="Meiryo" 出现 131 次
+  ✔ 词条行带「读音：」
+  ✔ 没有残留英文标题前缀
+  ✔ 默认语言标记 w:eastAsia="ja-JP"（styles.xml）
+
+[插件入口]
+  ✔ 注册 9 个工具：vocab_plan、vocab_collect、vocab_translate、vocab_build_docx、vocab_by_tag、vocab_status、vocab_transcribe、vocab_fetch、vocab_wordlist
+  ✔ vocab_build_docx.language = string enum[en,ja]
+  ✔ vocab_collect 有 language
+
+[本地服务启动]
+  ✔ 服务起来了：http://127.0.0.1:24231，词表 1 个（语言 en）
+  ✔ 分词：日本語 / を / 勉強 / し / て / い / ます
+  ✔ 读音：ニホンゴ / ヲ / ベンキョウ / シ / テ
+  ✔ 6 个词条，6 个带读音，勉強する → ベンキョウスル
+  ✔ 日文条目不查英文字典
+  ✔ 首页带语言选择入口
+
+结论：干净环境自检全部通过

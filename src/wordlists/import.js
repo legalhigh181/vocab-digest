@@ -25,15 +25,35 @@
  *   }
  */
 import { createHash } from 'node:crypto';
+import { normalizeJaEntryKey } from '../ja/entrykey.js';
 
-/** 词性行的识别：n. v. vt. vi. adj. adv. prep. conj. pron. phr. num. int. aux. art. */
-const POS_LINE_RE = /^(?:n|v|vt|vi|adj|adv|prep|conj|pron|phr|num|int|aux|art|abbr)\.$/i;
+/**
+ * 词性行识别：n. v. vt. vi. adj. adv. prep. conj. pron. phr. num. int. aux. art. abbr. prop.
+ *
+ * ⚠️ 必须包含 `prop.`（专有名词）：词性映射会把「固有名詞」映射成 `prop.`，
+ * 它一旦漏在词性表外面，导出再导入时会被当成英文词条，把整张卡拆坏。
+ */
+const POS_LINE_RE = /^(?:n|v|vt|vi|adj|adv|prep|conj|pron|phr|num|int|aux|art|abbr|prop|part|sym|filler|affix)\.$/i;
 
-/** 看起来像英文词条行：至少一个 ASCII 字母，且中文占比很低 */
+/** 看起来像英文词条行：至少一个 ASCII 字母，且中日文占比很低 */
 function looksEnglish(line) {
   if (!/[A-Za-z]/.test(line)) return false;
-  const cjk = (line.match(/[\u4e00-\u9fa5]/g) ?? []).length;
+  const cjk = (line.match(/[\u3040-\u30ff\u4e00-\u9fa5]/g) ?? []).length;
   return cjk === 0 || cjk / line.length < 0.2;
+}
+
+/**
+ * 看起来像**日文词条**行：含假名或汉字，且不是纯中文释义。
+ * 日文词条（`日本`）在 looksEnglish 眼里是 false（没有 ASCII 字母），
+ * 必须单独识别，否则会被当成释义行吃掉上一个词条。
+ */
+function looksJapanese(line) {
+  if (!/[\u3040-\u30ff\u4e00-\u9fa5]/.test(line)) return false;
+  // 太长的行基本是中文释义，不是词条
+  if (line.length > 20) return false;
+  // 以全角标点结尾的更像释义
+  if (/[。！？；，、]$/.test(line)) return false;
+  return true;
 }
 
 /** 统一换行：\r\n、单独的 \r、单独的 \n 都变成 \n */
@@ -44,6 +64,24 @@ export function normalizeNewlines(text) {
 /** 折叠连续空格，去首尾空白 */
 function tidy(s) {
   return String(s).replace(/[ \t\u3000]+/g, ' ').trim();
+}
+
+/**
+ * 这一行是不是「新词条行」。
+ *
+ * 英文词表沿用原来的「看起来像英文」判定；
+ * 日文词表额外允许「纯假名/汉字」开新词条 —— 否则 `日本` 会被当成释义行，
+ * 把上一个词条吃掉。日文表的判断更严：必须是短的、不以句末标点结尾的实体行。
+ */
+function isEntryLine(line, cur, japaneseTable) {
+  if (looksEnglish(line)) return true;
+  if (!japaneseTable) return false;
+  if (!looksJapanese(line)) return false;
+  // 日文表里：当前块还没有任何释义 → 这行是词条
+  if (!cur) return true;
+  if (!cur.senses.some((s) => s.meaning)) return false;
+  // 当前块已经有释义了，又来一个短日文行 → 新词条
+  return true;
 }
 
 /** 判断是不是短语：含空格，或含连字符但整体仍像一个固定表达 */
@@ -80,7 +118,12 @@ function splitEntry(englishLine) {
 }
 
 function makeCard(word, display, senses, meta = {}) {
-  const key = tidy(word).toLowerCase();
+  const raw = tidy(word);
+  // ⚠️ 只有英文才小写归一。日文（以及任何非英文表）必须保留原样：
+  // 小写会毁掉 `Vtuber` / `iPhone` / `USBメモリ`，也会让 entryKey 里的词形对不上，
+  // 往返一次就再也匹配不上原来的卡片。
+  const japanese = meta.language === 'ja' || meta.japanese === true;
+  const key = japanese ? raw : raw.toLowerCase();
   return {
     word: key,
     display: tidy(display) || key,
@@ -98,6 +141,27 @@ function makeCard(word, display, senses, meta = {}) {
  * @param {object} opts { source 文件名, defaultScene 默认场景标签 }
  * @returns {{ cards: Array, warnings: Array<{level,message}> }}
  */
+/**
+ * `#ja` 元信息行里 entryKey 的还原（`cardsToText` 的逆操作）。
+ *
+ * 写出去时把**每个** `|` 和 `\` 都加了反斜杠；还原必须**单遍扫描**：
+ * 连着做 `.replace(/\\\\/g,'\\')` 再 `.replace(/\\\|/g,'|')` 会把
+ * 「词形里本来就有的 `\|`」压成 `|`，转义信息就丢了。
+ */
+function unescapeKeyText(s) {
+  let out = '';
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    if (ch === '\\' && (s[i + 1] === '\\' || s[i + 1] === '|')) {
+      out += s[i + 1];
+      i += 1;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 export function parseWordListText(text, opts = {}) {
   const source = opts.source ?? 'imported.txt';
   const lines = normalizeNewlines(text).split('\n').map((l) => l.trim()).filter(Boolean);
@@ -111,38 +175,82 @@ export function parseWordListText(text, opts = {}) {
   const funcLines = spacedLines.filter((l) => l.split(' ').some((p) => FUNC_WORDS.has(p.toLowerCase())));
   const phraseFile = opts.phraseFile ?? (spacedLines.length >= 2 && funcLines.length / spacedLines.length >= 0.4);
 
+  // 这份文件里有没有日文元信息行 —— 有就按日文表处理（词条行可以是纯汉字/假名）
+  const japaneseTable = opts.japanese === true || lines.some((l) => l.startsWith('#ja'));
+
   let cur = null;
+  /** 下一张卡片要带上的元信息（来自 #ja 行） */
+  let pendingMeta = null;
 
   const flush = () => {
     if (!cur) return;
     for (const w of cur.entries) {
       if (!w) continue;
-      const card = makeCard(w, w, cur.senses, { source: opts.source, scene: opts.defaultScene });
+      const card = makeCard(w, w, cur.senses, {
+        source: opts.source,
+        scene: opts.defaultScene,
+        // 日文表：词形保持原样，不小写
+        language: cur.meta?.language,
+        japanese: japaneseTable,
+      });
+      // 保留 #ja 元信息行带来的字段
+      if (cur.meta) Object.assign(card, cur.meta);
       cards.push(card);
     }
     cur = null;
   };
 
   for (const line of lines) {
-    if (line.startsWith('#')) continue;
+    if (line.startsWith('#')) {
+      // `#ja <entryKey> 读音：… 词性：… 假名：… 未知：1` —— 日文卡片的元信息行。
+      //
+      // **位置约定：元信息行写在它所属卡片的前面**（即「词条 / 词性 / 释义」之前）。
+      // 理由：导入时一张卡是在遇到下一条词条行时才 flush 的，元信息行在前才能挂上；
+      // 如果写在后面，就已经被 flush 成一张卡了。
+      const m = /^#ja\s+(\S*)\s*(.*)$/.exec(line);
+      if (m) {
+        const meta = { language: 'ja' };
+        if (m[1] && m[1] !== '-') {
+          meta.entryKey = normalizeJaEntryKey(unescapeKeyText(m[1]));
+        }
+        const rd = /读音[:：]\s*(\S+)/.exec(m[2]);
+        if (rd) meta.reading = rd[1];
+        const ps = /词性[:：]\s*(\S+)/.exec(m[2]);
+        if (ps) meta.pos = ps[1];
+        const pd = /词性细节[:：]\s*(\S+)/.exec(m[2]);
+        if (pd) meta.posDetail = pd[1];
+        const kn = /假名[:：]\s*(\S+)/.exec(m[2]);
+        if (kn) meta.readingHiragana = kn[1];
+        if (/未知[:：]\s*1/.test(m[2])) {
+          meta.unknown = true;
+          meta.lemmaSource = 'surface';
+        }
+        // 挂到「下一张」卡片：先存 pending，flush 时合并
+        pendingMeta = { ...(pendingMeta ?? {}), ...meta };
+      }
+      continue;
+    }
     if (POS_LINE_RE.test(line)) {
       if (!cur) { warnings.push({ level: 'warn', message: `孤立词性行：${line}` }); continue; }
       cur.senses.push({ pos: line.toLowerCase(), meaning: '' });
       cur.last = 'pos';
       continue;
     }
-    if (looksEnglish(line)) {
-      // 英文行 = 新词条（短语表里大部分词条就是这种「英文行 → 中文行」结构）
+    if (isEntryLine(line, cur, japaneseTable)) {
+      // 词条行 = 新卡片（单词表是纯英文，日文表可以是纯汉字/假名）
       flush();
-      cur = { entries: splitEntry(line, { phraseFile }), senses: [], last: 'english' };
+      cur = {
+        entries: japaneseTable && !looksEnglish(line) ? [line] : splitEntry(line, { phraseFile }),
+        senses: [],
+        last: 'english',
+        meta: pendingMeta ?? undefined,
+      };
+      pendingMeta = null;
       continue;
     }
-    // 中文行 = 最近的词性对应的释义；没有词性行就挂到最后一个 sense 上
-    if (!cur) { warnings.push({ level: 'warn', message: `开头缺少英文词条：${line.slice(0, 20)}` }); continue; }
-    if (cur.last === 'pos' && cur.senses.length) {
-      const last = cur.senses[cur.senses.length - 1];
-      last.meaning = last.meaning ? `${last.meaning}；${line}` : line;
-    } else if (cur.senses.length) {
+    // 释义行 = 最近的词性对应的释义；没有词性行就挂到最后一个 sense 上
+    if (!cur) { warnings.push({ level: 'warn', message: `开头缺少词条：${line.slice(0, 20)}` }); continue; }
+    if (cur.senses.length) {
       const last = cur.senses[cur.senses.length - 1];
       last.meaning = last.meaning ? `${last.meaning}；${line}` : line;
     } else {
@@ -155,18 +263,26 @@ export function parseWordListText(text, opts = {}) {
   return { cards: dedupeCards(cards), warnings };
 }
 
-/** 合并重复词条：同一个词出现两次时把 senses 里没出现过的补进去 */
+/**
+ * 合并重复词条。
+ *
+ * ⚠️ 有 entryKey 的卡片（日文）必须按 **entryKey** 去重，不能按裸 word：
+ * `日本#ニホン` 和 `日本#ニッポン` 是两个不同的词，按 word 去重会把它们并成一条，
+ * 释义也会被拼成「日本（にほん）；日本（にっぽん）」。
+ */
 export function dedupeCards(cards) {
   const map = new Map();
   for (const c of cards) {
-    const prev = map.get(c.word);
-    if (!prev) { map.set(c.word, { ...c, senses: [...c.senses] }); continue; }
+    const key = c.entryKey || c.word;
+    const prev = map.get(key);
+    if (!prev) { map.set(key, { ...c, senses: [...c.senses] }); continue; }
     for (const s of c.senses) {
       const dup = prev.senses.some((p) => p.pos === s.pos && tidy(p.meaning) === tidy(s.meaning));
       if (!dup) prev.senses.push(s);
     }
-    if (c.display && c.display === c.word && prev.display !== prev.word) {
-      // 保留第一个有意义的展示名
+    // 补齐缺失的元信息（同一个 entryKey 才会走到这里，不会串项）
+    for (const f of ['entryKey', 'reading', 'readingHiragana', 'posDetail', 'lemmaSource', 'language']) {
+      if (c[f] && !prev[f]) prev[f] = c[f];
     }
   }
   return [...map.values()];
@@ -176,17 +292,29 @@ export function dedupeCards(cards) {
 export function cardsToText(cards) {
   const out = [];
   for (const c of cards) {
-    out.push(c.display || c.word);
-    if (!c.senses.length) {
-      out.push('');
-      continue;
+    // 元信息行放在整张卡片**之前**（#ja → 词条 → 词性 → 释义）。
+    // 导入时一张卡是在遇到下一条词条行时才收尾的，元信息行在前才能挂到这张卡上。
+    if (c.language === 'ja' && (c.entryKey || c.reading)) {
+      const parts = [
+        c.reading ? `读音：${c.reading}` : '',
+        c.pos ? `词性：${c.pos}` : '',
+        c.posDetail ? `词性细节：${c.posDetail}` : '',
+        c.readingHiragana ? `假名：${c.readingHiragana}` : '',
+        c.unknown ? '未知：1' : '',
+      ].filter(Boolean);
+      // entryKey 里的 | 需要转义，避免和分隔符混淆
+      const key = String(c.entryKey ?? '-').replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+      out.push(`#ja ${key} ${parts.join(' ')}`.trim());
     }
-    for (const s of c.senses) {
-      if (s.pos) out.push(s.pos);
-      if (s.meaning) out.push(s.meaning);
+    out.push(c.display || c.word);
+    if (c.senses.length) {
+      for (const s of c.senses) {
+        if (s.pos) out.push(s.pos);
+        if (s.meaning) out.push(s.meaning);
+      }
     }
   }
-  return `${out.join('\r\n').replace(/\r\n\r\n/g, '\r\n')}\r\n`;
+  return `${out.join('\r\n')}\r\n`;
 }
 
 /** 卡片集合的指纹：内容变了才需要重建索引 */

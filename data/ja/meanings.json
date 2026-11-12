@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "language": "ja",
+  "meaningLanguage": "zh",
+  "_说明": [
+    "日文词的本地释义文件。程序启动时会自动读这个文件（data/ja/meanings.json）。",
+    "字段：word（词形，必填）、meaning（释义，必填）、reading（读音，可选）、pos（词性，可选）、meaningLanguage（释义语言，可选，默认 zh）。",
+    "reading 决定这一条只匹配哪个读音 —— 同形异读的词（日本 ニホン / ニッポン）必须分别写两条。",
+    "不写 reading 且不写 pos 的条目是通配：该词形的任意读音、任意词性都会命中（只在没有更精确的条目时使用）。",
+    "想批量维护可以直接改成 TSV：词形<TAB>释义<TAB>读音<TAB>词性"
+  ],
+  "entries": [
+    { "word": "勉強する", "reading": "ベンキョウスル", "pos": "v.", "meaning": "学习，用功" },
+    { "word": "住む", "reading": "スム", "pos": "v.", "meaning": "居住，住" },
+    { "word": "飲む", "reading": "ノム", "pos": "v.", "meaning": "喝" },
+    { "word": "食べる", "reading": "タベル", "pos": "v.", "meaning": "吃" },
+    { "word": "走る", "reading": "ハシル", "pos": "v.", "meaning": "跑" },
+    { "word": "行く", "reading": "イク", "pos": "v.", "meaning": "去" },
+    { "word": "東京", "reading": "トウキョウ", "pos": "prop.", "meaning": "东京（地名）" },
+    { "word": "日本", "reading": "ニホン", "pos": "prop.", "meaning": "日本（读作 ニホン 时）" },
+    { "word": "日本", "reading": "ニッポン", "pos": "prop.", "meaning": "日本（读作 ニッポン 时，更口语/正式宣言）" },
+    { "word": "今日", "reading": "キョウ", "pos": "n.", "meaning": "今天" },
+    { "word": "本当", "reading": "ホントウ", "pos": "n.", "meaning": "真的，确实" }
+  ]
+}

@@ -1,0 +1,21 @@
+浏览器：C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe
+造好两个运行：probe-ui-ja-48484-mwayydqn / probe-ui-en-48484-mwayydqn
+服务：http://127.0.0.1:6759/
+PASS 页面加载后运行列表由 JS 填充 — 35 个运行
+PASS 页面上有语言选择入口（抓取/新表/界面） — {"langSel":"en,ja","newListLang":"en,ja","viewLang":"en,ja","title":"还没有选运行"}
+PASS 日语+语音识别时显示「识别质量有限」提醒
+PASS 切回英语后提醒自动收起
+PASS 能点开日语运行 — clicked
+PASS 日语词条卡渲染出来了 — 18 张卡
+PASS 中栏显示日语徽标 — badge=JA
+PASS 日语词条卡有片假名读音 — kata=ソト | ソット | ソウ | ハコ | エンディング | キニイル
+PASS 日语运行不显示英文音标 — .phon 节点 0 个
+PASS 日语的读音出现在卡片上 — ソトそと | ソットそっと | ソウそう | ハコはこ | エンディングえんでぃんぐ | 未收录
+统计行：词条 18 · 片段 27 · 未收录 2 · 当前显示 18 个
+副标题：samples\ja-audio\practice6.srt
+PASS 截图已保存 — C:\Users\18169\Documents\工作区 2\vocab-digest\docs\evidence-browser-ja.png（353 KB）
+PASS 能点开英语运行 — clicked
+PASS 切到英语后徽标变 EN — badge=EN
+PASS 英语词条有音标、没有日语读音行 — .phon=46 .reading=0
+
+合计 14 项，通过 14 项，失败 0 项

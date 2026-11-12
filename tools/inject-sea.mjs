@@ -64,13 +64,19 @@ function continueWith(data, blob, fuseAt, exePath) {
   console.log('numSec', numSec, 'fileAlign', fileAlign, 'sectAlign', sectAlign, 'rawPtr', rawPtr, 'va', va);
 
   // 4) 追加节头（节表后面就是空的，够放 40 字节）
+  //
+  // Characteristics = 0x40000040 是错的：0x40000000 是 IMAGE_SCN_MEM_READ 的笔误，
+  // 0x40 才是 IMAGE_SCN_CNT_INITIALIZED_DATA。带高位会让节头越界读，把后面的
+  // 数据目录当成节头解析，Windows 直接报「不是有效的 Win32 应用程序」。
+  // 可读 + 已初始化数据 = 0x40000000 | 0x00000040 里，读标志应为 0x40000000 的一部分…
+  // 不，IMAGE_SCN_MEM_READ = 0x40000000 确实是对的，真正错在下面这行：
   const hdr = Buffer.alloc(40);
   hdr.write('.sea\0\0\0\0', 0, 'latin1');
   hdr.writeUInt32LE(blob.length, 8); // VirtualSize
   hdr.writeUInt32LE(va, 12); // VirtualAddress
   hdr.writeUInt32LE(align(blob.length, fileAlign), 16); // SizeOfRawData
   hdr.writeUInt32LE(rawPtr, 20); // PointerToRawData
-  hdr.writeUInt32LE(0x40000040, 36); // 已初始化数据 | 可读
+  hdr.writeUInt32LE(0x40000040, 36); // Characteristics
   const padded = Buffer.concat([data, Buffer.alloc(Math.max(0, rawPtr - data.length))]);
   hdr.copy(padded, secTable + 40 * numSec);
 
@@ -84,9 +90,14 @@ function continueWith(data, blob, fuseAt, exePath) {
   // 7) 校验和清零
   padded.writeUInt32LE(0, opt + 64);
 
-  // 8) 写入 blob
-  writeFileSync(exePath, Buffer.concat([padded, blob]));
-  return { rawPtr, va, size: blob.length };
+  // 8) 写入 blob —— 必须补齐到 SizeOfRawData（节头里声明的大小），
+  //    否则文件长度小于节表声明的范围，Windows 加载器直接判定文件损坏，
+  //    报「不是有效的 Win32 应用程序」。
+  const rawSize = align(blob.length, fileAlign);
+  const tail = Buffer.alloc(rawSize);
+  blob.copy(tail, 0);
+  writeFileSync(exePath, Buffer.concat([padded, tail]));
+  return { rawPtr, va, size: blob.length, rawSize };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('inject-sea.mjs')) {

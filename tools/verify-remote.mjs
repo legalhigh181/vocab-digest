@@ -14,8 +14,9 @@ const FORBIDDEN = [
   ['样本数据', /(^|\/)samples\//],
   ['调试脚本', /(^|\/)scratch-/],
   ['可执行文件', /\.exe$/i],
-  ['ECDICT 词典', /ecdict/i],
-  ['whisper 模型', /ggml/i],
+  // 词典/模型只看数据文件，不看读它的代码（src/lexicon/ecdict.js 是正常的）
+  ['ECDICT 词典数据', /(^|\/)ecdict\.(csv|sqlite|db)$/i],
+  ['whisper 模型', /ggml.*\.bin$/i],
   ['素材原图', /-sheet\.png$/i],
   ['UI 版本快照', /(^|\/)versions\//],
   ['打包产物', /(^|\/)dist\//],

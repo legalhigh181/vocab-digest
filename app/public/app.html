@@ -3,142 +3,80 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>词汇库 · DeepSeek Virtual Maid</title>
+<meta name="theme-color" content="#f7f8fc">
+<title>词汇库 · 把喜欢的词留下来</title>
 <link rel="icon" href="/img/icon-round.png" type="image/png">
 <link rel="stylesheet" href="/app.css">
 <script id="d-state" type="application/json">{}</script>
 <script id="d-view" type="application/json">{}</script>
 </head>
-<body>
-
-<header class="top">
-  <div class="brand">
-    <img class="logo" src="/img/icon-round.png" alt="" width="44" height="44">
-    <div class="brand-text">
-      <span class="brand-name">词汇库</span>
-      <span class="brand-sub">Virtual Maid · 弹幕字幕整理</span>
-    </div>
-  </div>
-  <div class="topright">
-    <span id="dataHint" class="hint"></span>
-    <button id="btnDocx" class="primary">打开 Word 目录</button>
-  </div>
-</header>
-
-<main class="layout">
-  <aside class="col left">
-
-    <!-- 立绘区：表情随状态变化 -->
-    <figure class="hero" id="hero">
-      <div class="hero-stage">
-        <img class="hero-emo" id="heroEmo" src="/img/emo-laugh.png" alt="">
-        <div class="hero-bubble" id="heroBubble">把视频里的词收进本子里～</div>
-      </div>
-      <img class="hero-wordmark" src="/img/logo-wide.png" alt="DeepSeek Virtual Maid">
-      <ul class="hero-steps" id="heroSteps">
-        <li>贴地址</li><li>挑词表</li><li>出 Word</li>
-      </ul>
-    </figure>
-
-    <section class="card">
-      <h2><span class="step">1</span>视频地址</h2>
-      <div class="row">
-        <input id="link" type="text" placeholder="https://www.bilibili.com/video/BV..." autocomplete="off">
-      </div>
-      <div class="row small">
-        <label class="chk"><input id="withDanmaku" type="checkbox"> 弹幕也一起分析</label>
-        <label class="chk"><input id="asr" type="checkbox" checked> 没字幕就语音识别</label>
-      </div>
-      <div class="row">
-        <button id="btnFetch" class="primary grow">抓取字幕</button>
-        <button id="btnDigestLocal" class="ghost">本地文件</button>
-      </div>
-      <div id="fetchLog" class="log"></div>
-    </section>
-
-    <section class="card">
-      <h2><span class="step">2</span>词表<img class="tack" src="/img/el-bow.png" alt=""></h2>
-      <div class="row">
-        <select id="wordlistSelect"></select>
-      </div>
-      <div class="row small">
-        <button id="btnNewList" class="ghost">新建</button>
-        <button id="btnRenameList" class="ghost">重命名</button>
-        <button id="btnImportList" class="ghost">导入</button>
-        <button id="btnExportList" class="ghost">导出</button>
-      </div>
-      <div class="row small">
-        <label class="ghost filelabel" for="importFile">选文件导入</label>
-        <input id="importFile" type="file" accept=".txt,.md" class="file">
-        <span id="importName" class="muted tiny">未选择文件</span>
-      </div>
-      <div class="row small sub">
-        <label for="digestWordlist">分析时用</label>
-        <select id="digestWordlist"></select>
-      </div>
-      <div id="listHint" class="log"></div>
-    </section>
-
-    <section class="card">
-      <h2><span class="step">3</span>历史运行</h2>
-      <div id="runs" class="runs"></div>
-    </section>
-
-    <figure class="wave-strip" aria-hidden="true">
-      <img src="/img/el-whale.png" alt="" class="whale-swim">
-    </figure>
-  </aside>
-
-  <section class="col middle">
-    <div class="card bar">
-      <div class="barcode">
-        <img class="bow" src="/img/el-bow.png" alt="" width="48" height="40">
-        <div>
-          <div id="title" class="title">还没有选运行</div>
-          <div id="subtitle" class="subtitle"></div>
-          <div id="stats" class="stats"></div>
-        </div>
-      </div>
-      <div class="row wrap tools">
-        <label for="dim">分章维度</label>
-        <select id="dim" class="dimsel">
-          <option value="pos">词性</option>
-          <option value="difficulty">难度</option>
-          <option value="freq">频次</option>
-          <option value="source">来源</option>
-        </select>
-        <button id="btnBuild" class="ghost">按这个维度重出 Word</button>
-      </div>
-      <div id="chips" class="chips"></div>
-    </div>
-    <div id="items" class="items"></div>
+<body data-panel="workspace">
+<a class="skip-link" href="#workspace">跳到词条内容</a>
+<svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v15M12 5C9 3 5 3 3 4v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1Z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+</defs></svg>
+<div class="app-shell">
+<aside class="sidebar" id="library" aria-label="词表与历史">
+  <a class="brand" href="/" aria-label="词汇库首页"><span class="brand-icon"><svg class="icon"><use href="#i-book"/></svg></span><span><strong>词汇库<span class="brand-dot">.</span></strong><small>VOCAB NOTEBOOK</small></span></a>
+  <button class="primary new-video" id="btnImportVideo"><svg class="icon"><use href="#i-plus"/></svg> 导入一段视频</button>
+  <button class="nav-link selected" id="navWorkspace"><svg class="icon"><use href="#i-grid"/></svg> 学习工作台 <span>↗</span></button>
+  <section class="sidebar-section">
+    <div class="section-heading"><h2>我的词表</h2><button id="btnNewList" class="icon-button" aria-label="新建词表" title="新建词表"><svg class="icon"><use href="#i-plus"/></svg></button></div>
+    <label class="sr-only" for="wordlistSelect">当前词表</label><select id="wordlistSelect"></select><p id="listHint" class="muted tiny"></p>
+    <details class="list-settings"><summary>管理词表 <span>⌄</span></summary>
+      <div class="row"><label for="newListLang">新表语言</label><select id="newListLang"><option value="en">英语</option><option value="ja">日语</option></select></div>
+      <div class="row wrap"><button id="btnRenameList">重命名</button><button id="btnExportList">导出</button></div>
+      <label class="filelabel" for="importFile">选择词表文件<input id="importFile" type="file" accept=".txt,.md" class="file"></label><span id="importName" class="muted tiny">未选择文件</span><button id="btnImportList" class="full-width">导入词表</button>
+    </details>
   </section>
-
-  <aside class="col right">
-    <section class="card">
-      <h2>词表内容<img class="tack" src="/img/el-tail.png" alt=""></h2>
-      <div id="listCards" class="listCards"></div>
-      <div class="row small">
-        <button id="btnExportCards" class="ghost">导出词表</button>
-        <button id="btnFromRun" class="ghost">用本次结果建表</button>
-      </div>
-    </section>
-    <section class="card">
-      <h2>用法 / 详情</h2>
-      <div id="detail" class="detail">
-        <div class="detail-idle">
-          <img src="/img/emo-pout.png" alt="" class="idle-emo">
-          <span class="muted">点中间任意词条看用法，句子上的时间点可以直接跳到视频那一秒。</span>
-        </div>
-      </div>
-    </section>
-    <figure class="apron-note">
-      <img src="/img/el-apron.png" alt="" width="112">
-    </figure>
-  </aside>
+  <section class="history sidebar-section"><div class="section-heading"><h2><svg class="icon"><use href="#i-clock"/></svg> 最近学习</h2><span id="runCount" class="counter">0</span></div><div id="runs" class="runs"></div></section>
+  <div class="companion" id="hero"><img id="heroEmo" src="/img/studio-happy.png" alt="" width="62" height="62"><div><span class="companion-name">你的小小学习搭子</span><div id="heroBubble">慢慢来，每一个词都算数。</div></div></div>
+  <div id="dataHint" class="data-status" role="status"></div>
+</aside>
+<main class="main-area" id="workspace" tabindex="-1">
+  <header class="top"><div class="breadcrumb">我的学习空间 <span>/</span> <strong>词条工作台</strong></div><button id="btnDocx" class="quiet"><svg class="icon"><use href="#i-download"/></svg> Word 文件夹</button></header>
+  <nav class="mobile-nav" aria-label="工作区导航"><button data-panel-target="workspace" aria-pressed="true">工作台</button><button data-panel-target="library" aria-pressed="false">词表与历史</button><button data-panel-target="notebook" aria-pressed="false">收藏本</button></nav>
+  <div class="content">
+    <section class="welcome" aria-labelledby="welcomeTitle"><div class="welcome-copy"><span class="eyebrow">A LITTLE LEARNING, EVERY DAY</span><h1 id="welcomeTitle">把喜欢的词，<br>留在自己的世界里。</h1><p>从一段视频开始，收藏每一次听懂的瞬间。</p><button id="btnWelcomeImport" class="text-button">开始新的学习 <svg class="icon"><use href="#i-arrow"/></svg></button></div><div class="welcome-art" aria-hidden="true"><div class="art-orbit"></div><span class="art-caption">hello, new words!</span><img class="welcome-character" src="/img/studio-standing.png" alt=""><img class="art-star" src="/img/studio-star.png" alt=""><span class="art-note">一词一句 · 慢慢积累</span></div></section>
+    <div class="study-layout">
+      <section class="word-workspace" aria-label="分析词条">
+        <div class="workspace-heading"><div><span class="eyebrow">YOUR WORD COLLECTION</span><h2 id="title" class="title">从这里，开启新的一页</h2><div class="subtitle-row"><span id="langBadge" class="langBadge" hidden>EN</span><span id="subtitle" class="subtitle">选择左侧学习记录，或导入一段新视频。</span></div></div><span class="collection-mark" aria-hidden="true">Aa</span></div>
+        <div id="stats" class="stats"></div>
+        <div class="word-surface"><div class="toolbar">
+          <label class="search-wrap"><svg class="icon"><use href="#i-search"/></svg><span class="sr-only">搜索词条或释义</span><input id="q" type="search" placeholder="寻找一个词，或一种表达…" autocomplete="off"></label>
+          <div class="filter-row"><label for="sortSel">排序</label><select id="sortSel"><option value="freq">出现次数</option><option value="time">台词顺序</option></select><span class="filter-divider"></span><label for="dim">分组</label><select id="dim"><option value="pos">词性</option><option value="difficulty">难度</option><option value="freq">频次</option><option value="source">来源</option></select><details class="view-options"><summary aria-label="更多显示选项">•••</summary><div><label for="viewLang">显示语言</label><select id="viewLang"><option value="en">英语</option><option value="ja">日语</option></select></div></details></div>
+          <div id="chips" class="chips" aria-label="词条筛选"></div>
+        </div><div id="items" class="items" aria-label="词条列表"></div></div>
+        <p class="workspace-footnote">每个词，都有它的来处。点击词条，回到那一句。</p>
+      </section>
+      <aside class="notebook" id="notebook" aria-label="我的收藏本">
+        <section class="notebook-card"><div class="notebook-cover"><span class="eyebrow">MY LITTLE NOTEBOOK</span><h2>我的收藏本</h2><p>把想记住的，留在这里。</p><img src="/img/studio-whale.png" alt="" aria-hidden="true"></div><div class="notebook-body"><div class="section-heading"><h3 id="notebookName">当前词表</h3><span id="notebookCount" class="counter">0</span></div><div id="listCards" class="listCards"></div><button id="btnExportCards" class="full-width"><svg class="icon"><use href="#i-download"/></svg> 导出这份词表</button><button id="btnFromRun" class="text-button full-width" disabled>用本次结果新建词表 ↗</button></div></section>
+        <section class="export-note"><span class="eyebrow">TAKE YOUR WORDS WITH YOU</span><h3>也可以，写在纸上。</h3><p>按当前分组生成 Word，<br>让复习有一点翻书的仪式感。</p><button id="btnBuild" class="primary full-width" disabled><svg class="icon"><use href="#i-book"/></svg> 生成 Word 词表</button></section>
+        <p class="notebook-signature">Little words. Bigger worlds.</p>
+      </aside>
+    </div>
+  </div>
 </main>
-
-<div id="toast" class="toast"><img id="toastEmo" src="/img/emo-laugh.png" alt=""><span id="toastText"></span></div>
+</div>
+<dialog id="importDialog" class="import-dialog" aria-labelledby="importTitle">
+  <div class="dialog-heading"><div><span class="eyebrow">START A NEW PAGE</span><h2 id="importTitle">今天，想听懂什么？</h2></div><button id="btnCloseImport" class="icon-button" aria-label="关闭导入窗口"><svg class="icon"><use href="#i-close"/></svg></button></div>
+  <p class="muted">粘贴 B 站视频地址，我们一起把词整理好。</p>
+  <label class="field-label" for="link">视频地址</label><input id="link" type="text" placeholder="https://www.bilibili.com/video/BV..." autocomplete="off">
+  <div class="form-grid"><div><label class="field-label" for="langSel">视频语言</label><select id="langSel"><option value="en">英语</option><option value="ja">日语</option></select></div><div><label class="field-label" for="digestWordlist">分析时使用的词表</label><select id="digestWordlist"></select></div></div>
+  <p id="langHint" class="muted tiny"></p><div class="import-options"><label class="chk"><input id="asr" type="checkbox" checked> 没字幕就语音识别</label><label class="chk"><input id="withDanmaku" type="checkbox"> 同时收集弹幕</label></div>
+  <div id="jaAsrNote" class="note warn" hidden>日语语音识别使用本地小模型，长音、促音、撥音「ん」容易听错，偶尔会出现整句幻觉。请对照原视频核对字幕。</div>
+  <div class="import-actions"><button id="btnFetch" class="primary grow">抓取字幕 <svg class="icon"><use href="#i-arrow"/></svg></button><button id="btnDigestLocal">使用本地文件</button></div>
+  <div class="task-row"><span id="taskBar" class="muted tiny" role="status" hidden></span><button id="btnCancelFetch" class="quiet" disabled>取消抓取</button></div><div id="fetchLog" class="log" role="status"></div>
+</dialog>
+<dialog id="detailDialog" class="detail-dialog" aria-labelledby="detailHeading"><div class="dialog-heading"><div><span class="eyebrow">A WORD IN CONTEXT</span><h2 id="detailHeading">词条笔记</h2></div><button id="btnCloseDetail" class="icon-button" aria-label="关闭词条详情"><svg class="icon"><use href="#i-close"/></svg></button></div><div id="detail" class="detail"></div></dialog>
+<div id="toast" class="toast" role="status"><img id="toastEmo" src="/img/studio-happy.png" alt=""><span id="toastText"></span></div>
 <script src="/app.js"></script>
 </body>
 </html>
