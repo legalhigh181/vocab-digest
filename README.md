@@ -1,7 +1,14 @@
-# vocab-digest · 弹幕字幕 → 英语词汇 Word
+# vocab-digest · 弹幕字幕 → 词汇 Word（英语 / 日语）
 
-读网页/视频的**弹幕**与**字幕**，抽出英语单词，按**标签分类**整理成 Word 文档。
-零第三方依赖（只用 Node 内置模块），可以单独当命令行用，也可以作为 DSH 插件被 `PTC` 方式调用。
+把一条视频（或一堆字幕、弹幕）变成**能打印、能背的词表**。给它一个 B 站链接，它会自己去取字幕；没有字幕就用本地 whisper 转写；然后切词、还原词形、标读音与词性、按标签分章，最后出一份 Word。全程本地运行，不联网翻译、不耗 token。
+
+适合：**看剧/看课/看动画学语言的人**。日语支持片假名 + 平假名读音与 `unknown` 标记（词典外的词保留原形、不编造读音）；英语接 ECDICT 77 万词条离线词典。
+
+三种用法，按需挑一个：**Web 界面**（双击「词汇库」图标，本地手账式界面）、**命令行**（`vocab-english digest ...`）、**DSH 插件**（9 个 `vocab_*` 工具，让 AI 帮你跑完整条链路）。
+
+读网页/视频的**弹幕**与**字幕**，抽出单词，按**标签分类**整理成 Word 文档。
+英语路径只用 Node 内置模块；日文分词用 `kuromoji`（Apache-2.0，词典随发布包分发，解压即可离线分词）。
+可以单独当命令行用，也可以作为 DSH 插件被 `PTC` 方式调用。
 
 ```
 弹幕/字幕文件
@@ -23,7 +30,7 @@
 - **离线英汉词典**：接了 ECDICT（77 万词条），查词 1 毫秒，**不联网、不耗 token**
 - **按标签看**：词性 / 难度 / 来源 / 频次四个维度，可以切换分章方式
 - **Word 输出**：封面、目录、按标签分章、每个词条带音标 + 释义 + 原文用法（附时间戳）+ 剑桥词典超链接
-- **Web 界面**：本地起服务，粘地址 → 抓字幕 → 挑词表 → 出 Word，全程点鼠标
+- **Web 界面**：蓝白学习手账，导入弹窗、词条笔记抽屉、收藏本和手机页签；词条每次展示 50 条，搜索覆盖全部结果
 - **个人词表**：可以新建多张表、导入导出、重命名；不同视频用不同词表
 
 ## 从零开始（拿到代码后怎么跑）
@@ -77,7 +84,7 @@ node bin\vocab-english.js digest test\fixtures --run-id demo
 node bin\vocab-app.js --cwd . --port 7788
 ```
 
-浏览器打开 http://127.0.0.1:7788/ ，左侧粘 B 站地址，点「抓取字幕」，然后挑词表、点「出 Word」。
+浏览器打开 http://127.0.0.1:7788/ ，点「导入一段视频」，粘 B 站地址并选择语言，点「抓取字幕」。在工作台阅读词条，右侧可生成 Word 词表。
 
 想让它像普通软件一样双击打开，跑一次安装脚本，桌面就会多一个「词汇库」图标：
 
@@ -173,8 +180,74 @@ node bin\vocab-english.js report 20261108-123456
 
 **没有字幕怎么办？** 视频只有硬字幕（烧在画面里）或者压根没字幕时，用 `transcribe` 走语音识别——见下一节。
 
-## 语音识别（视频没有字幕时）
+## 从 B 站取数（`fetch`）
 
+```bash
+vocab-english fetch "https://www.bilibili.com/video/BV1xx?p=2" --no-asr
+```
+
+### 两个弹幕开关是分开的
+
+这是之前踩过的坑：早期只有「抓不抓」，没有「用不用」，结果弹幕会被顺手混进词频榜。
+
+| 开关 | 默认 | 管什么 |
+|---|---|---|
+| `--no-danmaku` | 抓 | 要不要**下载**弹幕文件 |
+| `--with-danmaku` | 不参与 | 下载到的弹幕要不要**进 digest** |
+
+所以「只有弹幕的视频」（没台词）必须显式加 `--with-danmaku`，否则会明确报错告诉你怎么开，而不是悄悄给你一个空结果。
+
+### 分 P 与跳转
+
+- `?p=2` 或 `--page 2` 指定分 P；**不存在的 P 会直接报错**「这个视频没有第 9 P（共 3 P）」，不会退回第 1 P。
+- 返回的 `inputs` 一定是**真实存在的文件路径**（可以直接喂给 `digest`）；
+  带 `.p2` 的那种名字只出现在 `labels` 里，是给人看的展示标签。
+- `meta.json` 里记着 `page` / `pageTitle` / `cid` / `playUrl`，界面上点句子的时间点就是靠它跳到正确的分 P。
+
+### 分片与失败可见
+
+弹幕按 B 站返回的**真实分片索引**取（`DmSegConfig` 的 `page_size` / `total`），
+并发上限默认 4（`--concurrency N` 可调）。失败分三种呈现，绝不会伪装成「零条弹幕」：
+
+| 情况 | 表现 |
+|---|---|
+| 索引接口失败 | 报错，`stage: index` |
+| 部分分片失败 | 返回已有弹幕 + `warning: "N/M 个分片下载失败，弹幕可能不完整"` |
+| 全部分片失败 | 报错，`stage: segments` |
+
+
+## 语言（T1：契约与词表隔离）
+
+分析语言由 `language` 参数决定：`en`（英语，默认）或 `ja`（日语，`jp` 是别名）。
+
+```bash
+vocab-english digest 某日剧.srt --language ja
+```
+
+| | 英语 `en` | 日语 `ja` |
+|---|---|---|
+| 词表目录 | `data/` | `data/ja/`（完全独立） |
+| 最短词长 | 3 | **1**（日语无空格，`猫`、`手` 要保留） |
+| 词表文件 | stopword / known / base / pos / 词形例外 | stopword / known |
+| 英文资源 | 需要 | **不加载、不要求** |
+
+要点：
+
+- 两套词表**绝不混读** —— 切到日语不会因为你没装英文 `pos.json` 而报错，反之亦然。
+- 路径写错（如 `--language fr`）直接报 `INVALID_LANGUAGE`，不会猜、不会回退到英语。
+- 落盘的 `digest.json` / `run.json` 带 `language` 与 `schemaVersion: 2`；**没有 `language` 字段的旧结果按 `en` 读**，老数据不会坏。
+- 用户显式写在 `config.local.json` 或命令行里的 `minLen` / `minFreq` 永远优先于语言默认值。
+
+> 日语这条链路已经可用：kuromoji 分词 → 基本形还原 → 片假名/平假名读音 → 词性，`--language ja` 是完整路径。
+> 三条已知限制：①kuromoji 对多读音词只取首选（「日本」标 `ニッポン`，不是 `ニホン`）；②词典外的词（人名、造词）保留表面形并标 `unknown`，**读音留空而不编造**；③日文首版不抽短语（英语的 PMI 与空格 n-gram 不适用于日语）。
+>
+> **日语语音识别的质量限制（必须说清）**：链路能跑通 ≠ 识别准。用 `ggml-small.bin` 转两段母语发音练习
+> （30.9s / 68.4s，Public Domain，`samples/ja-audio/`）做过人工对照：短词对约八成，但长音、促音、撥音「ん」的
+> 区分基本丢失，还出现过整句幻觉。发音练习也不等于自然对话——真实对话（语速、背景音、方言）只会更难。
+> 所以日语 ASR 结果**必须人工核对**；界面上（语言=日语 + 勾语音识别）与抓取日志里都有这条提示。
+
+
+## 语音识别（视频没有字幕时）
 本机 ffmpeg 自带 whisper.cpp 滤镜，不需要装 Python / torch / whisper 包。模型放 `models/`，默认 `ggml-small.bin`（465MB）。
 
 ```bash
@@ -251,16 +324,18 @@ vocab-english status                     历史运行、词表状态、语音识
 
 ## 作为 DSH 插件
 
-`src/index.js` 导出 Cordis 插件（`inject = ['tools']`），注册 7 个工具：
+`src/index.js` 导出 Cordis 插件（`inject = ['tools']`），注册 9 个工具：
 
 | 工具 | 作用 |
 |---|---|
 | `vocab_transcribe` | 音视频 → srt（ffmpeg 内置 whisper，GPU 约 4~9 倍实时） |
+| `vocab_fetch` | 从 B 站取数：有字幕轨下字幕，没有就下音频转写；返回的 `inputs` 直接喂给 `vocab_collect` |
 | `vocab_plan` | 体检：词表齐不齐、输入能不能识别、本次参数是什么（不写文件） |
 | `vocab_collect` | 解析 + 抽词，产出 `runs/<runId>/digest.json`，给出标签分布与高频词 |
 | `vocab_translate` | `mode=export` 导出待翻译批次；`mode=apply` 回写词性/释义并重出 Word |
-| `vocab_build_docx` | 生成/重生成 Word + 自检报告，可用 `by` 换分章维度 |
+| `vocab_build_docx` | 生成/重生成 Word + 自检报告，可用 `by` 换分章维度、`language` 覆盖语言 |
 | `vocab_by_tag` | 按标签查看（导出 txt 或按该维度重出 Word） |
+| `vocab_wordlist` | 自建词表：list / create / rename / activate / import / fromRun / add / digestFrom |
 | `vocab_status` | 词表状态、历史运行、语音识别可用性 |
 
 接入 profile（`%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml`）：
@@ -290,32 +365,40 @@ vocab-english status                     历史运行、词表状态、语音识
 ## 开发
 
 ```powershell
-# 测试（本机沙箱禁止子进程管道，必须加 --test-isolation=none 并显式列文件）
-node --test --test-isolation=none test\parsers.test.js test\text.test.js test\engine.test.js test\docx.test.js test\run.test.js test\tags.test.js
+# 全量测试（本机沙箱禁止子进程管道，必须加 --test-isolation=none 并显式列文件）
+node --test --test-isolation=none test\*.test.js
+
+# 编码体检（改过含中文的文件就跑；PowerShell 写入很容易变成 GBK 乱码）
+node tools\check-encoding.mjs
 
 # 插件输出契约校验（execute 返回的字段必须在 output.schema 里）
-node test\harness.mjs
+node tools\probe-t6-plugin.mjs
 ```
 
 ## 打包给别人用
 
 ```powershell
-# 打一个不含 66MB 词典、不含语音模型、不含自己词表的干净包
-# 做法：把 bin/ src/ app/ data/ tools/ 与根文件复制到临时目录，
-#       删掉 data\ecdict.csv、data\wordlists、app\public\img\*sheet*.png、runs/ versions/ models/，
-#       再用 Compress-Archive 压成 dist\词汇库-v1.0-windows.zip（约 3.3MB）
+# 白名单打包：只挑 bin/ src/ app/ 与必要数据，带上 kuromoji 词典（约 17MB）和依赖，
+# 不含 ECDICT 词典、语音模型、个人词表、运行记录
+node tools\pack-release.mjs
+
+# 解压到任意目录后做干净目录自检（34 项：结构、不夹带个人数据、离线分词、英文/日文 digest、Word、插件、本地服务）
+node tools\check-release.mjs "D:\某个解压目录"
 ```
 
-接收方需要 **Windows + Node.js 20+**；双击 `安装.cmd` 建快捷方式，词典和语音模型按 `发布说明.md` 自行选择是否补。
+产物 `dist\词汇库-v1.0-windows.zip` 约 20MB，输出里会打印**字节数与 SHA-256**——对外说“哪个包”就用这串哈希，改了代码必须重打包并更新文档里的哈希。
+接收方需要 **Windows + Node.js 20+**；双击 `安装.cmd` 建快捷方式，语音模型按 `发布说明.md` 自行补。
 
 ## 已知限制
 
-- **没有内置英汉词典**：释义要么由 LLM 经 `vocab_translate` 回写，要么自己在 `data/pos.json` 维护。
-  文档里没释义的条目只显示词性。
+- **英文释义靠 ECDICT**：没装词典时词条只有词性；词典里没有的词可以点「剑桥」在线查，或用 `vocab_translate` 回写。
 - **词性靠启发式**：POS 表命中优先，其次人工回写，最后才按后缀猜（`-tion`→名词 之类），
   猜错就用 `decisions.json` 纠正。
 - **所有全大写短词（≤4 字母）当刷屏丢弃**：`LOL`、`OMG` 这类；更长的大写词只有在同一批里
   出现过小写写法时才收。
 - **语音识别只认口播**：BGM 很响、多人抢话、口音重时准确率会掉；术语/人名容易识别错（错的形式
   会作为新词条出现，可以加进 `stopword.txt`）。whisper 对音乐段会输出舞台提示，已自动清洗。
-- **只做英语**：`--language en` 是默认，识别的词表也是英文；其它语言不在本次范围。
+- **日语 ASR 质量有限**：`ggml-small.bin` 对长音、促音、撥音「ん」的区分基本丢失，偶发整句幻觉；
+  实测发音练习 14 词对 8–9 个。日语结果必须人工核字幕，想更准只能换更大的模型。
+- **日语释义覆盖低**：`data/ja/meanings.json` 目前只有示例条目，绝大多数日文词条没有中文释义。
+- **只支持英语与日语**：`--language en|ja`，其它语言直接报 `INVALID_LANGUAGE`，不猜、不回退。
